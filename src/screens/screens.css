@@ -1,4 +1,4 @@
-/* أنماط مشتركة لكل الشاشات الرئيسية */
+/* أنماط مشتركة لكل الشاشات الرئيسية والنماذج */
 
 .screen {
   /* max-width يحافظ على أعمدة قراءة مريحة على شاشة الكمبيوتر —
@@ -8,22 +8,206 @@
   padding: calc(var(--safe-top) + var(--space-4)) var(--space-4) var(--space-6);
 }
 
-/* عنوان كبير بأسلوب iOS Large Title */
+/* عنوان كبير بأسلوب iOS Large Title + أزرار إجراءات في الطرف */
+.screen-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-2) var(--space-4);
+}
+
 .screen-header h1 {
   font-size: 30px;
   font-weight: 800;
   letter-spacing: -0.4px;
-  padding-block: var(--space-2) var(--space-4);
+  line-height: 1.2;
 }
 
-/* حالة "قيد البناء" المؤقتة للمراحل القادمة */
-.placeholder {
+.screen-subtitle {
+  font-size: 15px;
+  color: var(--label-secondary);
+  margin-top: 2px;
+}
+
+/* زر أيقونة دائري — هدف لمس 44px كامل */
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--tint);
+  background: transparent;
+  transition: background var(--dur-fast), transform var(--dur-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+
+.icon-btn:active {
+  background: var(--fill);
+  transform: scale(0.92);
+}
+
+.icon-btn.filled {
+  background: var(--fill);
+}
+
+/* رأس قسم داخل شاشة: عنوان + زر إجراء */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: var(--space-5) var(--space-2);
+}
+
+.section-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* قائمة بطاقات مجمّعة بأسلوب iOS Inset Grouped List */
+.card-list {
+  background: var(--surface);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+
+.card-list > * + * {
+  border-top: 0.5px solid var(--separator);
+}
+
+/* حالة فارغة ودّية */
+.empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  padding-top: 22vh;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-4);
   color: var(--label-tertiary);
   text-align: center;
   font-size: 15px;
+}
+
+/* شريط خطأ قابل لإعادة المحاولة */
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--surface);
+  border-radius: var(--radius-m);
+  padding: var(--space-3) var(--space-4);
+  color: var(--danger);
+  font-size: 15px;
+  margin-block: var(--space-3);
+}
+
+.error-banner button {
+  color: var(--tint);
+  font-weight: 600;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+
+/* ---------- حقول النماذج داخل النوافذ ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.field-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--label-secondary);
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  border-radius: var(--radius-s);
+  background: var(--fill);
+  font-size: 17px;
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+  color: var(--label-tertiary);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 90px;
+  line-height: 1.6;
+}
+
+/* أزرار النماذج */
+.btn-primary {
+  width: 100%;
+  min-height: 50px;
+  border-radius: var(--radius-m);
+  background: var(--tint);
+  color: var(--on-tint);
+  font-size: 17px;
+  font-weight: 600;
+  transition: opacity var(--dur-fast), transform var(--dur-fast) var(--ease-out);
+}
+
+.btn-primary:active {
+  opacity: 0.8;
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  background: var(--fill);
+  color: var(--label-tertiary);
+}
+
+.btn-destructive {
+  width: 100%;
+  min-height: 50px;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--danger);
+  font-size: 17px;
+  font-weight: 600;
+  transition: background var(--dur-fast);
+}
+
+.btn-destructive:active {
+  background: var(--fill);
+}
+
+/* زر نصي صغير (مثل "تم" في رأس النافذة) */
+.btn-text {
+  color: var(--tint);
+  font-size: 17px;
+  font-weight: 600;
+  min-height: 44px;
+  padding-inline: var(--space-2);
+}
+
+.btn-text:disabled {
+  color: var(--label-tertiary);
+}
+
+/* حركة دخول الشاشة عند التنقل بين التبويبات */
+.tab-panel {
+  animation: tab-in var(--dur-med) var(--ease-out);
+}
+
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

@@ -1,0 +1,30 @@
+/* أداة التبديل المقسّمة — نسخة iOS: مسار رمادي والخيار النشط "قرص" بارز */
+
+.segmented {
+  display: flex;
+  background: var(--fill);
+  border-radius: var(--radius-s);
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmented-item {
+  flex: 1;
+  min-height: 40px; /* داخل مسار بحشوة — الهدف الكلي ≥44px */
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--label);
+  transition: background var(--dur-fast), box-shadow var(--dur-fast),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.segmented-item:active {
+  transform: scale(0.97);
+}
+
+.segmented-item.active {
+  background: var(--surface);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}

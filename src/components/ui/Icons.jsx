@@ -85,3 +85,140 @@ export function CheckIcon(props) {
     </Svg>
   );
 }
+
+/** إضافة */
+export function PlusIcon(props) {
+  return (
+    <Svg strokeWidth={2} {...props}>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </Svg>
+  );
+}
+
+/** إغلاق */
+export function XIcon(props) {
+  return (
+    <Svg strokeWidth={2} {...props}>
+      <path d="m6 6 12 12" />
+      <path d="m18 6-12 12" />
+    </Svg>
+  );
+}
+
+/** حذف (سلة) */
+export function TrashIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4 7h16" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M6 7l1 13a1.5 1.5 0 0 0 1.5 1.3h7A1.5 1.5 0 0 0 17 20l1-13" />
+      <path d="M9 7V4.8A1.3 1.3 0 0 1 10.3 3.5h3.4A1.3 1.3 0 0 1 15 4.8V7" />
+    </Svg>
+  );
+}
+
+/** إعدادات (ترس) */
+export function GearIcon(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V19.6a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 17.96a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H2.9a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.55 7.5a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1.03-1.56V1.5" transform="translate(0 1.5) scale(0.95)" />
+    </Svg>
+  );
+}
+
+/** سهم يسار (للتنقل بين الشهور) */
+export function ChevronLeftIcon(props) {
+  return (
+    <Svg strokeWidth={2.2} {...props}>
+      <path d="m14.5 5.5-6 6.5 6 6.5" />
+    </Svg>
+  );
+}
+
+/** سهم يمين */
+export function ChevronRightIcon(props) {
+  return (
+    <Svg strokeWidth={2.2} {...props}>
+      <path d="m9.5 5.5 6 6.5-6 6.5" />
+    </Svg>
+  );
+}
+
+/** ورقة ملاحظة — اليوميات */
+export function NoteIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M5 4.5A1.5 1.5 0 0 1 6.5 3h11A1.5 1.5 0 0 1 19 4.5v15a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19.5z" />
+      <path d="M9 8h6" />
+      <path d="M9 12h6" />
+      <path d="M9 16h3.5" />
+    </Svg>
+  );
+}
+
+/** ساعة رملية — العدادات التنازلية */
+export function HourglassIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M7 3h10" />
+      <path d="M7 21h10" />
+      <path d="M8 3v3.5c0 2.5 4 4 4 5.5s-4 3-4 5.5V21" />
+      <path d="M16 3v3.5c0 2.5-4 4-4 5.5s4 3 4 5.5V21" />
+    </Svg>
+  );
+}
+
+/** لهب — سلسلة الإنجاز */
+export function FlameIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 21.5c3.6 0 6.5-2.6 6.5-6.4 0-3.2-2.1-5.3-3.7-7.3C13.4 6.1 12.7 4 12.7 2.5c-2.5 1.5-4 3.7-4 6 0 1.2.3 2 .3 2S7.5 9.8 7 8.5c-1 1.4-1.5 3-1.5 4.6 0 3.8 2.9 6.4 6.5 6.4z" />
+    </Svg>
+  );
+}
+
+/** تنزيل — تصدير JSON */
+export function DownloadIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3.5V15" />
+      <path d="m7.5 10.5 4.5 4.5 4.5-4.5" />
+      <path d="M4.5 20.5h15" />
+    </Svg>
+  );
+}
+
+/** رفع — استيراد JSON */
+export function UploadIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 15V3.5" />
+      <path d="M7.5 8 12 3.5 16.5 8" />
+      <path d="M4.5 20.5h15" />
+    </Svg>
+  );
+}
+
+/** طابعة — تصدير PDF */
+export function PrinterIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M7 8V3.5h10V8" />
+      <rect x="3.5" y="8" width="17" height="9" rx="2" />
+      <path d="M7 13.5h10V21H7z" />
+    </Svg>
+  );
+}
+
+/** قفل */
+export function LockIcon(props) {
+  return (
+    <Svg {...props}>
+      <rect x="5" y="10.5" width="14" height="10" rx="2.5" />
+      <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+    </Svg>
+  );
+}
