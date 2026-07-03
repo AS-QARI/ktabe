@@ -13,7 +13,7 @@ import {
 import './screens.css';
 import './SummaryScreen.css';
 
-const ALL_TABLES = ['tasks', 'entries', 'countdowns'];
+const ALL_TABLES = ['pages', 'blocks', 'countdowns'];
 
 export default function SummaryScreen({ onOpenSettings }) {
   // نفس مُصدِّر النسخة الاحتياطية يخدم الملخص — مصدر حقيقة واحد
@@ -21,7 +21,7 @@ export default function SummaryScreen({ onOpenSettings }) {
   const data = live.data;
 
   const today = useMemo(
-    () => (data ? computeTodayProgress(data.tasks) : null),
+    () => (data ? computeTodayProgress(data) : null),
     [data]
   );
   const overall = useMemo(
@@ -60,7 +60,7 @@ export default function SummaryScreen({ onOpenSettings }) {
             <div className="today-text">
               <h2>إنجاز اليوم</h2>
               {today.total === 0 ? (
-                <p>لا مهام لهذا اليوم بعد — أضف مهمة وابدأ</p>
+                <p>لا مهام في صفحة اليوم بعد — اكتب سطراً وحوّله لمهمة</p>
               ) : (
                 <p>
                   أنجزت <strong>{today.done}</strong> من {tasksAr(today.total)}
@@ -81,8 +81,8 @@ export default function SummaryScreen({ onOpenSettings }) {
             />
             <StatTile
               icon={<NoteIcon size={20} />}
-              value={overall.notesCount}
-              label="ملاحظة مكتوبة"
+              value={overall.pagesCount}
+              label="صفحة مكتوبة"
             />
             <StatTile
               icon={<FlameIcon size={20} />}

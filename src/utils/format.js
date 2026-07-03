@@ -1,7 +1,5 @@
 /* صيغ العرض العربية المشتركة */
 
-export const PRIORITY_LABELS = ['عادي', 'متوسط', 'عالي'];
-
 /** جمع "يوم" الصحيح نحوياً حسب العدد */
 export function daysAr(n) {
   if (n === 0) return 'صفر أيام';

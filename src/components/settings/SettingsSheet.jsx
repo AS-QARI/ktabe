@@ -116,7 +116,7 @@ export default function SettingsSheet({ open, onClose }) {
       window.alert('الملف ليس JSON صالحاً');
       return;
     }
-    const summary = `${backup.tasks?.length ?? '؟'} مهمة، ${backup.entries?.length ?? '؟'} ملاحظة، ${backup.countdowns?.length ?? '؟'} عداد`;
+    const summary = `${backup.pages?.length ?? '؟'} صفحة، ${backup.blocks?.length ?? '؟'} سطر، ${backup.countdowns?.length ?? '؟'} عداد`;
     if (
       !window.confirm(
         `سيتم استبدال كل بياناتك الحالية بمحتوى النسخة (${summary}).\nهذه العملية لا يمكن التراجع عنها. متابعة؟`

@@ -1,10 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
-  listTasks,
-  updateTask,
-  createTask,
-  setTaskCompleted,
-  deleteTask,
+  exportAll,
+  setBlockCompleted,
   listCountdowns,
   createCountdown,
   deleteCountdown,
@@ -20,13 +17,13 @@ import {
   parseDateKey,
 } from '../utils/dates';
 import { daysAr } from '../utils/format';
-import TaskItem from '../components/tasks/TaskItem';
-import TaskModal from '../components/tasks/TaskModal';
 import CountdownModal from '../components/countdowns/CountdownModal';
 import {
   GearIcon,
   PlusIcon,
   TrashIcon,
+  CheckIcon,
+  NoteIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   HourglassIcon,
@@ -34,35 +31,42 @@ import {
 import './screens.css';
 import './CalendarScreen.css';
 
-const TASK_TABLES = ['tasks'];
-const COUNTDOWN_TABLES = ['countdowns'];
+const ALL_TABLES = ['pages', 'blocks', 'countdowns'];
 const WEEKDAYS = weekdayNames();
 
-export default function CalendarScreen({ onOpenSettings }) {
-  const tasksLive = useLiveData(listTasks, TASK_TABLES);
-  const countdownsLive = useLiveData(listCountdowns, COUNTDOWN_TABLES);
+export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
+  const live = useLiveData(exportAll, ALL_TABLES);
+  const data = live.data;
 
   const [viewDate, setViewDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [selectedKey, setSelectedKey] = useState(todayKey);
-  const [taskModal, setTaskModal] = useState({ open: false, task: null });
   const [countdownModalOpen, setCountdownModalOpen] = useState(false);
 
   const today = todayKey();
   const cells = useMemo(() => buildMonthGrid(viewDate), [viewDate]);
 
-  /** المهام مفهرسة بيوم الاستحقاق — للنقاط تحت الأيام ولقائمة اليوم المحدد */
-  const tasksByDay = useMemo(() => {
-    const map = new Map();
-    for (const t of tasksLive.data ?? []) {
-      if (!t.due_date) continue;
-      if (!map.has(t.due_date)) map.set(t.due_date, []);
-      map.get(t.due_date).push(t);
+  /** المهام مفهرسة بتاريخ صفحتها — للنقاط تحت الأيام ولقائمة اليوم المحدد */
+  const { tasksByDay, writingDays } = useMemo(() => {
+    const pageDate = new Map((data?.pages ?? []).map((p) => [p.id, p.page_date]));
+    const byDay = new Map();
+    for (const b of data?.blocks ?? []) {
+      if (b.kind !== 'task') continue;
+      const d = pageDate.get(b.page_id);
+      if (!d) continue;
+      if (!byDay.has(d)) byDay.set(d, []);
+      byDay.get(d).push(b);
     }
-    return map;
-  }, [tasksLive.data]);
+    for (const list of byDay.values()) {
+      list.sort((a, b) => a.position - b.position);
+    }
+    return {
+      tasksByDay: byDay,
+      writingDays: new Set((data?.pages ?? []).map((p) => p.page_date)),
+    };
+  }, [data]);
 
   const selectedTasks = tasksByDay.get(selectedKey) ?? [];
   const isCurrentMonth =
@@ -75,59 +79,36 @@ export default function CalendarScreen({ onOpenSettings }) {
   };
 
   const goToday = () => {
-    setViewDate(() => {
-      const now = new Date();
-      return new Date(now.getFullYear(), now.getMonth(), 1);
-    });
+    const now = new Date();
+    setViewDate(new Date(now.getFullYear(), now.getMonth(), 1));
     setSelectedKey(today);
   };
 
-  /* ---------- عمليات المهام (نفس منطق الشاشة الرئيسية) ---------- */
-
-  const toggleTask = async (task) => {
-    const done = !task.is_completed;
-    tasksLive.setData((prev) =>
-      prev.map((t) =>
-        t.id === task.id
-          ? { ...t, is_completed: done, completed_at: done ? new Date().toISOString() : null }
-          : t
-      )
-    );
-    try {
-      await setTaskCompleted(task.id, done);
-    } catch {
-      tasksLive.reload();
-    }
+  /** إكمال مهمة من قائمة اليوم — تحديث متفائل */
+  const toggleBlock = (block) => {
+    navigator.vibrate?.(10);
+    const done = !block.is_completed;
+    live.setData((d) => ({
+      ...d,
+      blocks: d.blocks.map((b) =>
+        b.id === block.id
+          ? { ...b, is_completed: done, completed_at: done ? new Date().toISOString() : null }
+          : b
+      ),
+    }));
+    setBlockCompleted(block.id, done).catch(() => live.reload());
   };
-
-  const saveTask = async (fields) => {
-    if (taskModal.task) {
-      await updateTask(taskModal.task.id, fields);
-    } else {
-      await createTask(fields);
-    }
-    setTaskModal({ open: false, task: taskModal.task });
-    await tasksLive.reload();
-  };
-
-  const removeTask = async (task) => {
-    await deleteTask(task.id);
-    setTaskModal({ open: false, task: null });
-    await tasksLive.reload();
-  };
-
-  /* ---------- عمليات العدادات ---------- */
 
   const saveCountdown = async (fields) => {
     await createCountdown(fields);
     setCountdownModalOpen(false);
-    await countdownsLive.reload();
+    await live.reload();
   };
 
   const removeCountdown = async (c) => {
     if (!window.confirm(`حذف عداد «${c.title}»؟`)) return;
     await deleteCountdown(c.id);
-    await countdownsLive.reload();
+    await live.reload();
   };
 
   return (
@@ -202,6 +183,10 @@ export default function CalendarScreen({ onOpenSettings }) {
                       className={`calendar-dot${t.is_completed ? ' done' : ''}`}
                     />
                   ))}
+                  {/* يوم فيه كتابة بلا مهام: نقطة رمادية واحدة */}
+                  {!tasksByDay.has(cell.key) && writingDays.has(cell.key) && (
+                    <span className="calendar-dot writing" />
+                  )}
                 </span>
               </button>
             )
@@ -215,29 +200,51 @@ export default function CalendarScreen({ onOpenSettings }) {
         <h2>مهام {relativeDayLabel(selectedKey)}</h2>
         <button
           type="button"
-          className="icon-btn"
-          aria-label="إضافة مهمة لهذا اليوم"
-          onClick={() =>
-            setTaskModal({ open: true, task: null, presetDue: selectedKey })
-          }
+          className="btn-text open-day-btn"
+          onClick={() => onOpenDay(selectedKey)}
         >
-          <PlusIcon size={22} />
+          <NoteIcon size={18} />
+          فتح الصفحة
         </button>
       </div>
 
+      {live.error && (
+        <div className="error-banner">
+          <span>تعذّر التحميل</span>
+          <button type="button" onClick={live.reload}>أعد المحاولة</button>
+        </div>
+      )}
+
       {selectedTasks.length === 0 ? (
         <div className="empty-state compact">
-          <p>لا مهام مستحقة في هذا اليوم</p>
+          <p>
+            {writingDays.has(selectedKey)
+              ? 'لا مهام في صفحة هذا اليوم — افتحها لإضافة سطر مهمة'
+              : 'لا صفحة لهذا اليوم بعد — افتحها وابدأ الكتابة'}
+          </p>
         </div>
       ) : (
         <div className="card-list">
           {selectedTasks.map((t) => (
-            <TaskItem
-              key={t.id}
-              task={t}
-              onToggle={toggleTask}
-              onOpen={(task) => setTaskModal({ open: true, task })}
-            />
+            <div key={t.id} className={`cal-task-row${t.is_completed ? ' done' : ''}`}>
+              <button
+                type="button"
+                className="cal-task-circle"
+                role="checkbox"
+                aria-checked={t.is_completed}
+                aria-label={t.is_completed ? 'إلغاء الإكمال' : 'إكمال المهمة'}
+                onClick={() => toggleBlock(t)}
+              >
+                <CheckIcon size={12} />
+              </button>
+              <button
+                type="button"
+                className="cal-task-text"
+                onClick={() => onOpenDay(selectedKey)}
+              >
+                {t.content || 'مهمة بلا نص'}
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -256,34 +263,18 @@ export default function CalendarScreen({ onOpenSettings }) {
         </button>
       </div>
 
-      {countdownsLive.error && (
-        <div className="error-banner">
-          <span>تعذّر تحميل العدادات</span>
-          <button type="button" onClick={countdownsLive.reload}>أعد المحاولة</button>
-        </div>
-      )}
-
-      {countdownsLive.data?.length === 0 ? (
+      {data?.countdowns?.length === 0 ? (
         <div className="empty-state">
           <HourglassIcon size={40} />
           <p>أضف مناسباتك المهمة وتابع كم يوماً يفصلك عنها</p>
         </div>
       ) : (
         <div className="countdown-grid">
-          {countdownsLive.data?.map((c) => (
+          {data?.countdowns?.map((c) => (
             <CountdownCard key={c.id} countdown={c} onDelete={removeCountdown} />
           ))}
         </div>
       )}
-
-      <TaskModal
-        open={taskModal.open}
-        task={taskModal.task}
-        preset={taskModal.presetDue ? { due_date: taskModal.presetDue } : null}
-        onClose={() => setTaskModal((m) => ({ ...m, open: false }))}
-        onSave={saveTask}
-        onDelete={removeTask}
-      />
 
       <CountdownModal
         open={countdownModalOpen}
@@ -321,7 +312,15 @@ function CountdownCard({ countdown, onDelete }) {
         {state === 'future' && (
           <>
             <span className="countdown-num">{diff}</span>
-            <span className="countdown-label">{diff === 1 ? 'يوم متبقٍ' : diff === 2 ? 'يومان متبقيان' : diff <= 10 ? 'أيام متبقية' : 'يوماً متبقياً'}</span>
+            <span className="countdown-label">
+              {diff === 1
+                ? 'يوم متبقٍ'
+                : diff === 2
+                  ? 'يومان متبقيان'
+                  : diff <= 10
+                    ? 'أيام متبقية'
+                    : 'يوماً متبقياً'}
+            </span>
           </>
         )}
         {state === 'now' && <span className="countdown-now">هو اليوم! 🎉</span>}

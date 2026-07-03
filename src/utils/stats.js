@@ -1,6 +1,6 @@
 import { toDateKey, todayKey, diffDaysBetweenKeys } from './dates';
 
-/* حسابات الملخص — كلها من البيانات الخام بالتوقيت المحلي للجهاز.
+/* حسابات الملخص — من بيانات نموذج الدفتر (صفحات + سطور).
    الأحجام صغيرة (تطبيق شخصي) فالحساب في المتصفح أبسط وأدق من SQL
    لأن "اليوم" يُعرَّف بمنطقة المستخدم الزمنية لا بمنطقة الخادم. */
 
@@ -9,28 +9,43 @@ function dayOf(timestamp) {
   return timestamp ? toDateKey(new Date(timestamp)) : null;
 }
 
+function taskBlocks(data) {
+  return data.blocks.filter((b) => b.kind === 'task');
+}
+
 /**
  * ملخص اليوم: "أنجزت X من Y"
- * مهام اليوم = المستحقة اليوم (أياً كانت حالتها) + ما أُنجز اليوم من غيرها
- * — فالمهمة التي أنجزتها اليوم تُحسب لك حتى لو لم تكن مجدولة لهذا اليوم.
+ * مهام اليوم = مهام صفحات اليوم (أياً كانت حالتها) + ما أُنجز اليوم
+ * من صفحات أخرى — فالمهمة التي أنجزتها اليوم تُحسب لك أينما كُتبت.
  */
-export function computeTodayProgress(tasks) {
+export function computeTodayProgress(data) {
   const today = todayKey();
-  const dueToday = tasks.filter((t) => t.due_date === today);
-  const doneExtra = tasks.filter(
-    (t) => t.due_date !== today && dayOf(t.completed_at) === today
+  const todayPageIds = new Set(
+    data.pages.filter((p) => p.page_date === today).map((p) => p.id)
   );
-  const total = dueToday.length + doneExtra.length;
-  const done = dueToday.filter((t) => t.is_completed).length + doneExtra.length;
-  return { done, total, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
+  const tasks = taskBlocks(data);
+  const onToday = tasks.filter((t) => todayPageIds.has(t.page_id));
+  const doneElsewhere = tasks.filter(
+    (t) => !todayPageIds.has(t.page_id) && dayOf(t.completed_at) === today
+  );
+  const total = onToday.length + doneElsewhere.length;
+  const done =
+    onToday.filter((t) => t.is_completed).length + doneElsewhere.length;
+  return {
+    done,
+    total,
+    percent: total === 0 ? 0 : Math.round((done / total) * 100),
+  };
 }
 
 /**
  * أطول سلسلة أيام متتالية فيها إنجاز — قاعدة عمل:
- * أكبر عدد أيام متتالية سُجّل في كل منها completed_at لمهمة واحدة على الأقل
+ * أكبر عدد أيام متتالية سُجّل في كل منها إكمال مهمة واحدة على الأقل
  */
-export function computeLongestStreak(tasks) {
-  const days = [...new Set(tasks.map((t) => dayOf(t.completed_at)).filter(Boolean))].sort();
+export function computeLongestStreak(data) {
+  const days = [
+    ...new Set(taskBlocks(data).map((t) => dayOf(t.completed_at)).filter(Boolean)),
+  ].sort();
   let longest = 0;
   let run = 0;
   for (let i = 0; i < days.length; i++) {
@@ -40,18 +55,17 @@ export function computeLongestStreak(tasks) {
   return longest;
 }
 
-/** أيام الاستخدام: أيام مميزة حصل فيها أي نشاط (إنشاء/إنجاز/تعديل) */
-export function computeUsageDays({ tasks, entries, countdowns }) {
+/** أيام الاستخدام: أيام مميزة حصل فيها أي نشاط */
+export function computeUsageDays(data) {
   const days = new Set();
-  for (const t of tasks) {
-    days.add(dayOf(t.created_at));
-    if (t.completed_at) days.add(dayOf(t.completed_at));
+  for (const p of data.pages) {
+    days.add(p.page_date);
   }
-  for (const e of entries) {
-    days.add(dayOf(e.created_at));
-    days.add(dayOf(e.updated_at));
+  for (const b of data.blocks) {
+    days.add(dayOf(b.created_at));
+    if (b.completed_at) days.add(dayOf(b.completed_at));
   }
-  for (const c of countdowns) {
+  for (const c of data.countdowns) {
     days.add(dayOf(c.created_at));
   }
   days.delete(null);
@@ -61,9 +75,9 @@ export function computeUsageDays({ tasks, entries, countdowns }) {
 /** كل مقاييس الملخص الشامل دفعة واحدة */
 export function computeOverallStats(data) {
   return {
-    totalCompleted: data.tasks.filter((t) => t.is_completed).length,
-    notesCount: data.entries.length,
-    longestStreak: computeLongestStreak(data.tasks),
+    totalCompleted: taskBlocks(data).filter((t) => t.is_completed).length,
+    pagesCount: data.pages.length,
+    longestStreak: computeLongestStreak(data),
     usageDays: computeUsageDays(data),
   };
 }

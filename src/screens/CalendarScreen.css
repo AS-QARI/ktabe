@@ -104,8 +104,70 @@
   background: var(--label-tertiary);
 }
 
+/* يوم فيه كتابة حرة فقط (بلا مهام) */
+.calendar-dot.writing {
+  background: var(--label-tertiary);
+  opacity: 0.6;
+}
+
 .empty-state.compact {
   padding: var(--space-4);
+}
+
+/* زر فتح صفحة اليوم من التقويم */
+.open-day-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 15px;
+}
+
+/* صف مهمة من صفحة اليوم المحدد */
+.cal-task-row {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  padding-inline-start: var(--space-3);
+}
+
+.cal-task-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.8px solid var(--tint);
+  background: transparent;
+  color: transparent;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: background var(--dur-fast), transform var(--dur-med) var(--ease-spring);
+}
+
+.cal-task-circle:active {
+  transform: scale(0.85);
+}
+
+.cal-task-row.done .cal-task-circle {
+  background: var(--tint);
+  color: var(--on-tint);
+}
+
+.cal-task-text {
+  flex: 1;
+  text-align: start;
+  font-size: 17px;
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  min-height: 48px;
+  transition: opacity var(--dur-fast);
+}
+
+.cal-task-text:active {
+  opacity: 0.6;
+}
+
+.cal-task-row.done .cal-task-text {
+  color: var(--label-tertiary);
+  text-decoration: line-through;
 }
 
 /* ---------- العدادات ---------- */

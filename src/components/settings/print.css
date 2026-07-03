@@ -51,36 +51,28 @@
     color: #777;
   }
 
-  .print-view table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 10.5pt;
-  }
-
-  .print-view th,
-  .print-view td {
-    border: 0.5pt solid #bbb;
-    padding: 4pt 6pt;
-    text-align: start;
-    vertical-align: top;
-  }
-
-  .print-view th {
-    background: #eee;
-  }
-
-  .print-desc {
-    color: #555;
-    font-size: 9.5pt;
-  }
-
-  .print-entry {
+  .print-page {
     break-inside: avoid;
-    margin-bottom: 10pt;
+    margin-bottom: 12pt;
   }
 
-  .print-content {
-    white-space: pre-wrap;
+  .print-lines {
+    list-style: none;
+    padding-inline-start: 0;
+    margin: 4pt 0;
+  }
+
+  .print-lines li {
+    padding: 1.5pt 0;
+    border-bottom: 0.4pt solid #eee;
+  }
+
+  .print-lines.sub {
+    margin-inline-start: 18pt;
+  }
+
+  .print-task {
+    font-weight: 600;
   }
 
   .print-countdowns li {

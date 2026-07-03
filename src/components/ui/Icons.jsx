@@ -213,6 +213,51 @@ export function PrinterIcon(props) {
   );
 }
 
+/** حرف نص — تحويل مهمة إلى نص عادي */
+export function TextIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4 6V4h16v2" />
+      <path d="M12 4v16" />
+      <path d="M9 20h6" />
+    </Svg>
+  );
+}
+
+/** دائرة مهمة — تحويل نص إلى مهمة */
+export function TaskCircleIcon(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m8.5 12 2.5 2.5 4.5-5" />
+    </Svg>
+  );
+}
+
+/** إزاحة لسطر فرعي (مهمة جانبية/تعليق) */
+export function IndentIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M21 6H8" />
+      <path d="M21 12H8" />
+      <path d="M21 18H8" />
+      <path d="m5 9.5-2.5 2.5L5 14.5" />
+    </Svg>
+  );
+}
+
+/** إعادة السطر لمستوى رئيسي */
+export function OutdentIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M21 6H8" />
+      <path d="M21 12H8" />
+      <path d="M21 18H8" />
+      <path d="m2.5 9.5 2.5 2.5-2.5 2.5" />
+    </Svg>
+  );
+}
+
 /** قفل */
 export function LockIcon(props) {
   return (

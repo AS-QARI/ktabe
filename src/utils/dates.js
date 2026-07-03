@@ -26,6 +26,13 @@ export function diffDaysBetweenKeys(fromKey, toKey) {
   return Math.round(ms / 86400000);
 }
 
+/** إزاحة مفتاح تاريخ بعدد أيام (سالب = للخلف) */
+export function shiftDateKey(key, delta) {
+  const d = parseDateKey(key);
+  d.setDate(d.getDate() + delta);
+  return toDateKey(d);
+}
+
 /* التقويم الميلادي بالعربية مع أرقام لاتينية —
    مهم: ar-SA وحدها قد تعطي التقويم الهجري، لذا نحدد gregory صراحة */
 const AR_LOCALE = 'ar-u-ca-gregory-nu-latn';
@@ -55,6 +62,13 @@ const fullWithYearFmt = new Intl.DateTimeFormat(AR_LOCALE, {
 /** "الخميس، 3 يوليو" */
 export function formatFullDate(d) {
   return fullFmt.format(d);
+}
+
+const weekdayFmt = new Intl.DateTimeFormat(AR_LOCALE, { weekday: 'long' });
+
+/** "الخميس" */
+export function formatWeekday(d) {
+  return weekdayFmt.format(d);
 }
 
 /** "يوليو 2026" — عنوان شهر التقويم */

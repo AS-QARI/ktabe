@@ -12,7 +12,7 @@ import { join } from 'node:path';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const BASE_URL = 'http://localhost:5173';
 const OUT_DIR = process.argv[2] ?? 'screenshots';
-const TABS = ['tasks', 'calendar', 'summary'];
+const TABS = ['day', 'calendar', 'summary'];
 
 mkdirSync(OUT_DIR, { recursive: true });
 
@@ -29,6 +29,13 @@ await page.setViewport({
   isMobile: true,
   hasTouch: true,
 });
+
+// COLOR_SCHEME=light node scripts/screenshot.mjs — لالتقاط الوضع الفاتح
+if (process.env.COLOR_SCHEME) {
+  await page.emulateMediaFeatures([
+    { name: 'prefers-color-scheme', value: process.env.COLOR_SCHEME },
+  ]);
+}
 
 const errors = [];
 page.on('console', (m) => {

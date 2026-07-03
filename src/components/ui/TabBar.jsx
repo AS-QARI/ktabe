@@ -1,8 +1,8 @@
-import { ChecklistIcon, CalendarIcon, ChartIcon } from './Icons';
+import { NoteIcon, CalendarIcon, ChartIcon } from './Icons';
 import './TabBar.css';
 
 const TABS = [
-  { id: 'tasks', label: 'المهام', Icon: ChecklistIcon },
+  { id: 'day', label: 'يومي', Icon: NoteIcon },
   { id: 'calendar', label: 'التقويم', Icon: CalendarIcon },
   { id: 'summary', label: 'الملخص', Icon: ChartIcon },
 ];

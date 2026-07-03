@@ -1,0 +1,356 @@
+/* شاشة "يومي" — الدفتر الورقي المسطّر بالأحمر */
+
+.day-screen {
+  padding-top: calc(var(--safe-top) + var(--space-2));
+}
+
+.day-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-1) var(--space-3);
+}
+
+/* منتقي التاريخ الحقيقي مخفي — زر التقويم يفتحه عبر showPicker */
+.day-date-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* الإعدادات في أقصى اليسار — نفس موضعها في باقي الشاشات */
+.day-settings-btn {
+  margin-inline-start: auto;
+}
+
+/* ---------- الكتاب والورقة ---------- */
+
+.book {
+  perspective: 1800px;
+}
+
+.paper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 62dvh;
+  background-color: var(--paper);
+  border: 0.5px solid var(--paper-edge);
+  /* كعب الكتاب على اليمين: زوايا اليمين حادة قليلاً واليسار دائرية كورقة */
+  border-start-start-radius: 4px;
+  border-end-start-radius: 4px;
+  border-start-end-radius: 16px;
+  border-end-end-radius: 16px;
+  /* أوراق مكدّسة تحتها — إيحاء الدفتر */
+  box-shadow:
+    0 1px 3px rgba(70, 35, 30, 0.1),
+    -2px 3px 0 -1px var(--paper),
+    -2px 3px 3px -1px rgba(70, 35, 30, 0.12),
+    -4px 6px 0 -2px var(--paper),
+    -4px 6px 5px -2px rgba(70, 35, 30, 0.1);
+  /* التسطير: خط هامش عمودي + أسطر أفقية حمراء خفيفة */
+  background-image:
+    linear-gradient(var(--rule-margin), var(--rule-margin)),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--rule-h) - 1px),
+      var(--rule) calc(var(--rule-h) - 1px) var(--rule-h)
+    );
+  background-size: 1.5px 100%, 100% var(--rule-h);
+  background-position: calc(100% - 52px) 0, 0 0;
+  background-repeat: no-repeat, repeat;
+  overflow: hidden;
+}
+
+/* قلب الصفحة كالكتاب: الورقة الجديدة تدور حول كعب الكتاب */
+.paper.flip-prev {
+  animation: flip-prev 500ms var(--ease-out);
+  transform-origin: 100% 50%;
+}
+
+@keyframes flip-prev {
+  from {
+    transform: rotateY(-65deg);
+    opacity: 0.3;
+  }
+}
+
+.paper.flip-next {
+  animation: flip-next 500ms var(--ease-out);
+  transform-origin: 0% 50%;
+}
+
+@keyframes flip-next {
+  from {
+    transform: rotateY(65deg);
+    opacity: 0.3;
+  }
+}
+
+/* ---------- رأس الورقة ---------- */
+
+.paper-head {
+  height: calc(var(--rule-h) * 2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: var(--space-1);
+  flex-shrink: 0;
+}
+
+.paper-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.paper-weekday {
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--tint);
+  letter-spacing: -0.3px;
+}
+
+.paper-daynum {
+  font-size: 13px;
+  color: var(--label-secondary);
+}
+
+.page-turn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--tint);
+  transition: background var(--dur-fast), transform var(--dur-fast) var(--ease-out);
+}
+
+.page-turn:active {
+  background: var(--fill);
+  transform: scale(0.9);
+}
+
+/* ---------- السطور ---------- */
+
+.paper-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.paper-line {
+  display: flex;
+  align-items: flex-start;
+  min-height: var(--rule-h);
+}
+
+/* الهامش الأيمن: تسكن فيه دائرة المهمة (بمحاذاة خط الهامش) */
+.line-gutter {
+  width: 52px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding-top: calc((var(--rule-h) - 24px) / 2);
+}
+
+/* السطر الفرعي: يزاح لداخل الصفحة تحت أبيه */
+.paper-line.sub .line-gutter {
+  width: 84px;
+  justify-content: flex-end;
+  padding-inline-end: 6px;
+}
+
+.line-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.8px solid var(--tint);
+  background: var(--paper);
+  color: transparent;
+  display: grid;
+  place-items: center;
+  transition: background var(--dur-fast), border-color var(--dur-fast),
+    opacity var(--dur-fast), transform var(--dur-med) var(--ease-spring);
+}
+
+.paper-line.sub .line-circle {
+  width: 19px;
+  height: 19px;
+}
+
+.line-circle:active {
+  transform: scale(0.85);
+}
+
+.done .line-circle {
+  background: var(--tint);
+  color: var(--on-tint);
+}
+
+/* دائرة التحويل الشبح على سطور النص: تظهر عند المرور أو التركيز */
+.line-circle.ghost {
+  border-color: var(--label-tertiary);
+  opacity: 0;
+}
+
+.paper-line:hover .line-circle.ghost,
+.paper-line:focus-within .line-circle.ghost {
+  opacity: 0.55;
+}
+
+.line-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  resize: none;
+  outline: none;
+  overflow: hidden;
+  min-height: var(--rule-h);
+  font: inherit;
+  font-size: 17px;
+  line-height: var(--rule-h); /* النص يجلس على أسطر التسطير تماماً */
+  padding: 0 2px 0 14px;
+  color: var(--label);
+}
+
+.is-task .line-input {
+  font-weight: 500;
+}
+
+.done .line-input {
+  color: var(--label-tertiary);
+  text-decoration: line-through;
+}
+
+.line-input::placeholder {
+  color: var(--label-tertiary);
+}
+
+/* بداية الكتابة في صفحة فارغة */
+.paper-starter {
+  min-height: calc(var(--rule-h) * 3);
+  text-align: start;
+  color: var(--label-tertiary);
+  font-size: 17px;
+  line-height: var(--rule-h);
+  padding-inline: 66px 16px;
+  cursor: text;
+}
+
+/* منطقة فارغة أسفل السطور — نقرة تضيف سطراً بالنهاية (كالورق الحقيقي) */
+.paper-tail {
+  flex: 1;
+  min-height: calc(var(--rule-h) * 3);
+  cursor: text;
+}
+
+/* ---------- ذيل الورقة ---------- */
+
+.paper-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  flex-shrink: 0;
+}
+
+.page-dots {
+  display: flex;
+}
+
+.page-dot {
+  width: 26px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+}
+
+.page-dot::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--label-tertiary);
+  transition: background var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
+}
+
+.page-dot.active::before {
+  background: var(--tint);
+  transform: scale(1.25);
+}
+
+.page-no {
+  font-size: 13px;
+  color: var(--label-tertiary);
+}
+
+.add-page {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 15px;
+}
+
+/* ---------- شريط أدوات السطر ---------- */
+
+.line-toolbar {
+  position: fixed;
+  inset-inline: var(--space-3);
+  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 10px);
+  z-index: 60;
+  max-width: 520px;
+  margin-inline: auto;
+  display: flex;
+  justify-content: space-around;
+  gap: var(--space-1);
+  background: var(--bar-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--radius-m);
+  padding: 5px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
+  animation: toolbar-in 220ms var(--ease-out);
+}
+
+@keyframes toolbar-in {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+}
+
+.line-tool {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding-inline: var(--space-3);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--label);
+  transition: background var(--dur-fast);
+}
+
+.line-tool svg {
+  color: var(--tint);
+}
+
+.line-tool:active {
+  background: var(--fill);
+}
+
+.line-tool:disabled {
+  opacity: 0.35;
+}
+
+.line-tool.danger,
+.line-tool.danger svg {
+  color: var(--danger);
+}
