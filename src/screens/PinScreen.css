@@ -1,0 +1,160 @@
+/* شاشة رمز الدخول — بأسلوب قفل iOS:
+   نقاط في الأعلى، لوحة أرقام دائرية كبيرة، اهتزاز عند الخطأ */
+
+.pin-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: calc(var(--safe-top) + var(--space-6)) var(--space-6)
+    calc(var(--safe-bottom) + var(--space-7));
+}
+
+.pin-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+/* شعار بأسلوب أيقونة تطبيق iOS: مربع بزوايا كبيرة بلون التمييز */
+.pin-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-l);
+  background: var(--tint);
+  color: var(--on-tint);
+  display: grid;
+  place-items: center;
+}
+
+.pin-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.pin-prompt {
+  font-size: 16px;
+  color: var(--label-secondary);
+}
+
+/* ---------- نقاط الرمز ---------- */
+
+.pin-dots {
+  display: flex;
+  gap: var(--space-4);
+  min-height: 14px;
+  transition: opacity var(--dur-fast);
+}
+
+.pin-dots.busy {
+  opacity: 0.4;
+}
+
+.pin-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.5px solid var(--label-secondary);
+  transition: background var(--dur-fast), border-color var(--dur-fast),
+    transform var(--dur-fast) var(--ease-spring);
+}
+
+.pin-dot.filled {
+  background: var(--label);
+  border-color: var(--label);
+  transform: scale(1.15);
+}
+
+/* اهتزاز أفقي عند الرمز الخاطئ — نفس لغة iOS البصرية للرفض */
+.pin-dots.shake {
+  animation: pin-shake 0.45s var(--ease-out);
+}
+
+@keyframes pin-shake {
+  20% { transform: translateX(-10px); }
+  40% { transform: translateX(9px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(4px); }
+  100% { transform: translateX(0); }
+}
+
+.pin-error {
+  font-size: 15px;
+  color: var(--danger);
+  min-height: 1.5em;
+}
+
+/* ---------- لوحة الأرقام ---------- */
+
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4) var(--space-6);
+}
+
+/* 74px: أكبر بكثير من حد اللمس الأدنى 44px — القفل يُستخدم بيد واحدة
+   وغالباً أثناء الحركة، فالأهداف الكبيرة تقلل الخطأ */
+.pin-key {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: var(--fill);
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background var(--dur-med) var(--ease-out),
+    transform var(--dur-med) var(--ease-out), opacity var(--dur-fast);
+}
+
+/* تغذية راجعة فورية عند الضغط، وتلاشي ناعم عند الإفلات */
+.pin-key:active:not(:disabled) {
+  background: var(--fill-strong);
+  transform: scale(0.94);
+  transition-duration: 0s;
+}
+
+.pin-key:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* زر المسح: بلا خلفية — إجراء ثانوي لا ينافس الأرقام بصرياً */
+.pin-key-ghost {
+  background: transparent;
+  color: var(--label-secondary);
+}
+
+/* زر التأكيد: بلون التمييز — الإجراء الأساسي الوحيد في الشاشة */
+.pin-key-ok {
+  background: var(--tint);
+  color: var(--on-tint);
+}
+
+.pin-key-ok:disabled {
+  background: var(--fill);
+  color: var(--label-tertiary);
+  opacity: 1;
+}
+
+/* شاشات قصيرة (جوالات صغيرة): نضغط المسافات بدل قص المحتوى */
+@media (max-height: 640px) {
+  .pin-key {
+    width: 64px;
+    height: 64px;
+    font-size: 26px;
+  }
+
+  .pin-logo {
+    width: 56px;
+    height: 56px;
+  }
+}
