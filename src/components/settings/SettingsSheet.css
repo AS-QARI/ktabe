@@ -1,0 +1,98 @@
+/* ورقة الإعدادات — قوائم مجمّعة بأسلوب iOS Settings */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-secondary);
+  text-transform: uppercase;
+  padding: var(--space-4) var(--space-3) var(--space-2);
+}
+
+/* داخل الورقة الخلفية surface — نميز القوائم بخلفية الصفحة */
+.settings .card-list {
+  background: var(--bg);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 50px;
+  padding-inline: var(--space-4);
+  text-align: start;
+  font-size: 17px;
+  transition: background var(--dur-fast);
+}
+
+.settings-row:active {
+  background: var(--fill);
+}
+
+.settings-row:disabled {
+  opacity: 0.5;
+}
+
+.settings-row-icon {
+  color: var(--tint);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.settings-row-icon.danger {
+  color: var(--danger);
+}
+
+.settings-row-label {
+  flex: 1;
+}
+
+.settings-row-label.danger {
+  color: var(--danger);
+}
+
+.settings-chevron {
+  color: var(--label-tertiary);
+  transition: transform var(--dur-med) var(--ease-out);
+}
+
+.settings-chevron.open {
+  transform: rotate(-90deg);
+}
+
+.pin-change-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.pin-change-form .form-input {
+  background: var(--surface);
+  text-align: center;
+  letter-spacing: 4px;
+}
+
+.pin-change-msg {
+  font-size: 15px;
+  color: var(--danger);
+  text-align: center;
+}
+
+.pin-change-msg.ok {
+  color: var(--success);
+}
+
+.settings-footer {
+  font-size: 13px;
+  color: var(--label-tertiary);
+  text-align: center;
+  padding: var(--space-5) var(--space-4) var(--space-2);
+  line-height: 1.6;
+}

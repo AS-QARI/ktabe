@@ -8,8 +8,9 @@ const PRIORITY_OPTIONS = PRIORITY_LABELS.map((label, value) => ({ value, label }
 /**
  * نافذة إضافة/تعديل مهمة: عنوان، وصف، أولوية، تاريخ استحقاق.
  * task = null → وضع الإضافة. onSave تستلم الحقول، والأب يقرر إنشاء أم تعديل.
+ * preset: قيم ابتدائية اختيارية لوضع الإضافة (مثل استحقاق يوم محدد من التقويم).
  */
-export default function TaskModal({ open, task, onClose, onSave, onDelete }) {
+export default function TaskModal({ open, task, preset, onClose, onSave, onDelete }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState(0);
@@ -22,10 +23,10 @@ export default function TaskModal({ open, task, onClose, onSave, onDelete }) {
       setTitle(task?.title ?? '');
       setDescription(task?.description ?? '');
       setPriority(task?.priority ?? 0);
-      setDueDate(task?.due_date ?? '');
+      setDueDate(task?.due_date ?? preset?.due_date ?? '');
       setBusy(false);
     }
-  }, [open, task]);
+  }, [open, task, preset]);
 
   const canSave = title.trim().length > 0 && !busy;
 

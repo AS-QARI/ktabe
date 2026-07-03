@@ -1,0 +1,112 @@
+/* شاشة الملخص: بطاقة اليوم (حلقة + نص) وشبكة الإحصائيات */
+
+.today-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  background: var(--surface);
+  border-radius: var(--radius-m);
+  padding: var(--space-5);
+}
+
+.ring-wrap {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+.ring-wrap svg {
+  position: absolute;
+  inset: 0;
+}
+
+.ring-track,
+.ring-fill {
+  fill: none;
+  stroke-linecap: round;
+}
+
+/* المسار: درجة أفتح من نفس لون التعبئة — الحالة تُقرأ على الحلقة كلها */
+.ring-track {
+  stroke: color-mix(in srgb, var(--tint) 18%, transparent);
+}
+
+.ring-fill {
+  stroke: var(--tint);
+  transition: stroke-dashoffset 800ms var(--ease-out);
+}
+
+/* رقم البطل: كبير، بنفس خط الواجهة، بأرقام متناسبة (وليست tabular) */
+.ring-value {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.today-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.today-text h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.today-text p {
+  font-size: 16px;
+  color: var(--label-secondary);
+  line-height: 1.5;
+}
+
+.today-text strong {
+  color: var(--label);
+}
+
+/* ---------- شبكة الإحصائيات ---------- */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  background: var(--surface);
+  border-radius: var(--radius-m);
+  padding: var(--space-4);
+}
+
+.stat-icon {
+  color: var(--tint);
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
+  margin-bottom: var(--space-1);
+}
+
+/* القيمة بحبر النص الأساسي — اللون هوية الأيقونة، لا الرقم */
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  line-height: 1.1;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--label-secondary);
+  line-height: 1.4;
+}

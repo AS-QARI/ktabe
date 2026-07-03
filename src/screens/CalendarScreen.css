@@ -1,0 +1,191 @@
+/* شاشة التقويم والعدادات */
+
+.calendar-card {
+  background: var(--surface);
+  border-radius: var(--radius-m);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.calendar-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.calendar-title h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.calendar-today-btn {
+  font-size: 15px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-top: var(--space-2);
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-tertiary);
+  padding-block: var(--space-1);
+}
+
+/* خلية يوم: ≥44px هدف لمس، رقم في دائرة + نقاط المهام تحته */
+.calendar-day {
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 3px;
+  gap: 2px;
+  border-radius: var(--radius-s);
+  transition: background var(--dur-fast);
+}
+
+.calendar-day:active {
+  background: var(--fill);
+}
+
+.calendar-day-num {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+
+/* المحدد: تعبئة رمادية — اليوم الحالي: دائرة زرقاء ممتلئة (لغة تقويم آبل) */
+.calendar-day.selected .calendar-day-num {
+  background: var(--fill-strong);
+  font-weight: 600;
+}
+
+.calendar-day.today .calendar-day-num {
+  color: var(--tint);
+  font-weight: 700;
+}
+
+.calendar-day.today.selected .calendar-day-num {
+  background: var(--tint);
+  color: var(--on-tint);
+}
+
+.calendar-dots {
+  display: flex;
+  gap: 3px;
+  height: 6px;
+}
+
+.calendar-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tint);
+}
+
+.calendar-dot.done {
+  background: var(--label-tertiary);
+}
+
+.empty-state.compact {
+  padding: var(--space-4);
+}
+
+/* ---------- العدادات ---------- */
+
+.countdown-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 480px) {
+  .countdown-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.countdown-card {
+  background: var(--surface);
+  border-radius: var(--radius-m);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.countdown-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.countdown-title {
+  font-size: 16px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countdown-delete {
+  width: 36px;
+  height: 36px;
+  color: var(--label-tertiary);
+  margin-inline-end: calc(var(--space-2) * -1);
+}
+
+.countdown-value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.countdown-num {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--tint);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+}
+
+.countdown-label {
+  font-size: 15px;
+  color: var(--label-secondary);
+}
+
+.countdown-now {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--success);
+}
+
+.countdown-past {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--label-tertiary);
+}
+
+.countdown-date {
+  font-size: 13px;
+  color: var(--label-tertiary);
+}
