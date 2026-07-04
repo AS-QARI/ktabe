@@ -5,7 +5,7 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export const supabaseConfigError =
   !url || !key
-    ? 'إعدادات Supabase ناقصة. أضف VITE_SUPABASE_URL و VITE_SUPABASE_PUBLISHABLE_KEY في GitHub Actions secrets.'
+    ? 'إعدادات Supabase ناقصة وقت البناء. إذا النشر عبر GitHub Actions أضف VITE_SUPABASE_URL و VITE_SUPABASE_PUBLISHABLE_KEY في Actions secrets، وإذا النشر من main/docs ارفع مجلد docs المبني من جهازك.'
     : null;
 
 export const supabase = supabaseConfigError
@@ -14,4 +14,5 @@ export const supabase = supabaseConfigError
       // لا نستخدم نظام حسابات Supabase إطلاقاً — الحماية عبر PIN فقط
       auth: { persistSession: false },
     });
+
 
