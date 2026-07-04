@@ -478,38 +478,7 @@
 
 
 
-/* ---------- عنوان اليوم وحجم النص ---------- */
-
-.text-size-picker {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  margin-inline-start: auto;
-  padding: 3px;
-  border: 0.5px solid var(--separator);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.text-size-option {
-  min-width: 34px;
-  min-height: 32px;
-  padding-inline: 7px;
-  border-radius: 999px;
-  color: var(--label-secondary);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.text-size-option.text-md { font-size: 12px; }
-.text-size-option.text-lg { font-size: 13px; }
-.text-size-option.text-xl { font-size: 14px; }
-
-.text-size-option.active {
-  background: var(--tint);
-  color: var(--on-tint);
-}
+/* ---------- عنوان اليوم ---------- */
 
 .paper-head {
   height: calc(var(--rule-h) * 3);
@@ -540,73 +509,86 @@
   color: var(--label-tertiary);
 }
 
-.paper-sm .line-input { font-size: 14px; }
-.paper-md .line-input { font-size: 16px; }
-.paper-lg .line-input { font-size: 19px; }
-.paper-xl .line-input { font-size: 22px; }
-
-.paper-lg .paper-line.sub .line-input { font-size: 16px; }
-.paper-xl .paper-line.sub .line-input { font-size: 18px; }
-
 @media (max-width: 460px) {
   .day-topbar {
     gap: 6px;
     padding-inline: 8px;
   }
-
-  .text-size-picker {
-    gap: 2px;
-  }
-
-  .text-size-option {
-    min-width: 30px;
-    padding-inline: 5px;
-    font-size: 10px;
-  }
-
-  .text-size-option.text-xl {
-    font-size: 12px;
-  }
 }
 
-/* ---------- سحب المهمات للفرعيات ---------- */
+/* ---------- محرر غني داخل السطر ---------- */
 
-.drag-handle {
-  width: 28px;
-  min-height: var(--rule-h);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
+.rich-line-input {
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
+}
+
+.rich-line-input:empty::before {
+  content: attr(data-placeholder);
   color: var(--label-tertiary);
-  cursor: grab;
-  touch-action: none;
+  pointer-events: none;
 }
 
-.drag-handle:active {
-  cursor: grabbing;
+.rich-line-input span,
+.rich-line-input strong,
+.rich-line-input b {
+  line-height: inherit;
+}
+
+.rich-size-sm { font-size: 14px; }
+.rich-size-md { font-size: 16px; }
+.rich-size-lg { font-size: 20px; }
+.rich-size-xl { font-size: 24px; }
+
+.paper-line.sub .rich-size-sm { font-size: 13px; }
+.paper-line.sub .rich-size-md { font-size: 14px; }
+.paper-line.sub .rich-size-lg { font-size: 17px; }
+.paper-line.sub .rich-size-xl { font-size: 20px; }
+
+.line-toolbar {
+  overflow-x: auto;
+  justify-content: flex-start;
+  scrollbar-width: none;
+}
+
+.line-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.line-size-tools {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.line-size-tool {
+  min-width: 34px;
+  min-height: 38px;
+  padding-inline: 8px;
+  border-radius: 9px;
+  color: var(--label-secondary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.line-size-tool:active {
+  background: var(--fill);
   color: var(--tint);
 }
 
-.drag-handle span {
-  font-size: 16px;
-  line-height: 1;
-  transform: rotate(90deg);
-}
+@media (max-width: 460px) {
+  .line-tool {
+    padding-inline: 10px;
+    white-space: nowrap;
+  }
 
-.paper-line.dragging {
-  opacity: 0.45;
+  .line-size-tool {
+    min-width: 31px;
+    padding-inline: 6px;
+  }
 }
-
-.paper-line.drop-target {
-  background: rgba(255, 255, 255, 0.07);
-  box-shadow: inset 3px 0 0 var(--tint);
-}
-
-.paper-line.drop-target .line-input {
-  color: var(--tint);
-}
-
-.text-size-picker + .day-settings-btn {
-  margin-inline-start: 0;
-}
-

@@ -33,11 +33,11 @@ import './screens.css';
 import './DayScreen.css';
 
 const SYNC_TABLES = ['pages', 'blocks'];
-const TEXT_SIZE_OPTIONS = [
-  { value: 'sm', label: 'صغير', className: 'text-sm' },
-  { value: 'md', label: 'عادي', className: 'text-md' },
-  { value: 'lg', label: 'كبير', className: 'text-lg' },
-  { value: 'xl', label: 'أكبر', className: 'text-xl' },
+const INLINE_TEXT_SIZE_OPTIONS = [
+  { value: 'sm', label: 'ص', title: 'نص صغير' },
+  { value: 'md', label: 'ع', title: 'نص عادي' },
+  { value: 'lg', label: 'ك', title: 'نص كبير' },
+  { value: 'xl', label: 'أكبر', title: 'نص أكبر' },
 ];
 
 function pageMetaKey(dateKey) {
@@ -56,6 +56,76 @@ function writeLocalPageMeta(dateKey, patch) {
   const next = { ...readLocalPageMeta(dateKey), ...patch };
   localStorage.setItem(pageMetaKey(dateKey), JSON.stringify(next));
   return next;
+}
+
+function escapeHtml(value) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function sanitizeRichHtml(content) {
+  return content
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/\s+on\w+=("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\s+(href|src)=("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/<span\b(?![^>]*class=("|')rich-size-(sm|md|lg|xl)\1)[^>]*>/gi, '<span>')
+    .replace(/<(?!\/?(?:span|strong|b|em|br|div|p)\b)[^>]+>/gi, '');
+}
+
+function contentToHtml(content) {
+  if (!content) return '';
+  if (isBold(content)) return `<strong>${escapeHtml(content.slice(2, -2))}</strong>`;
+  if (/<\/?(?:span|strong|b|em|br|div|p|font)\b/i.test(content)) return sanitizeRichHtml(content);
+  return escapeHtml(content).replace(/\n/g, '<br>');
+}
+
+function isEmptyContent(content) {
+  return !content || content.replace(/<[^>]*>/g, '').replace(/&nbsp;|\u200b/g, '').trim() === '';
+}
+
+function placeCaretAtEnd(el) {
+  const range = document.createRange();
+  const selection = window.getSelection();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function selectionBelongsTo(el) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return false;
+  const range = selection.getRangeAt(0);
+  return el.contains(range.commonAncestorContainer);
+}
+
+function applyInlineTextSize(el, size) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return false;
+  const range = selection.getRangeAt(0);
+  if (!el.contains(range.commonAncestorContainer)) return false;
+
+  const span = document.createElement('span');
+  span.className = `rich-size-${size}`;
+  if (range.collapsed) {
+    span.appendChild(document.createTextNode('\u200b'));
+    range.insertNode(span);
+    placeCaretAtEnd(span);
+    return true;
+  }
+
+  span.appendChild(range.extractContents());
+  range.insertNode(span);
+  selection.removeAllRanges();
+  const nextRange = document.createRange();
+  nextRange.selectNodeContents(span);
+  selection.addRange(nextRange);
+  return true;
 }
 
 /** يمدد ارتفاع السطر مع التفاف النص — فيبقى النص جالساً على التسطير */
@@ -144,9 +214,6 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     ...(page?.title != null ? { title: page.title } : {}),
     ...(page?.text_size != null ? { text_size: page.text_size } : {}),
   };
-  const textSize = TEXT_SIZE_OPTIONS.some((opt) => opt.value === pageMeta.text_size)
-    ? pageMeta.text_size
-    : 'md';
 
   /** شجرة السطور مسطّحة: جذور بترتيبها ثم أبناء كل جذر */
   const rows = useMemo(() => {
@@ -208,7 +275,11 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     const el = inputRefs.current.get(pendingFocus);
     if (el) {
       el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
+      if (typeof el.setSelectionRange === 'function') {
+        el.setSelectionRange(el.value.length, el.value.length);
+      } else {
+        placeCaretAtEnd(el);
+      }
       setPendingFocus(null);
     }
   });
@@ -472,13 +543,37 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       insertAfter(row);
-    } else if (e.key === 'Backspace' && row.block.content === '' && rows.length > 1) {
+    } else if (e.key === 'Backspace' && isEmptyContent(row.block.content) && rows.length > 1) {
       e.preventDefault();
       removeRow(row);
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
       e.preventDefault();
-      toggleBoldBlock(row.block);
+      applyBoldToFocusedSelection(row.block);
     }
+  };
+
+  const saveFocusedEditor = (block) => {
+    const el = inputRefs.current.get(block.id);
+    if (!el) return;
+    editContent(block, el.innerHTML);
+  };
+
+  const applyBoldToFocusedSelection = (block) => {
+    const el = inputRefs.current.get(block.id);
+    if (!el) return;
+    el.focus();
+    if (!selectionBelongsTo(el)) placeCaretAtEnd(el);
+    document.execCommand('bold', false, null);
+    saveFocusedEditor(block);
+  };
+
+  const applySizeToFocusedSelection = (block, size) => {
+    const el = inputRefs.current.get(block.id);
+    if (!el) return;
+    el.focus();
+    if (!selectionBelongsTo(el)) placeCaretAtEnd(el);
+    applyInlineTextSize(el, size);
+    saveFocusedEditor(block);
   };
 
   /* ================= التنقل بين الأيام ================= */
@@ -531,19 +626,6 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             العودة لليوم
           </button>
         )}
-        <div className="text-size-picker" aria-label="حجم النص">
-          {TEXT_SIZE_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`text-size-option ${option.className}${textSize === option.value ? ' active' : ''}`}
-              aria-pressed={textSize === option.value}
-              onClick={() => savePagePatch({ text_size: option.value })}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
         <button
           type="button"
           className="icon-btn day-settings-btn"
@@ -557,7 +639,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       <div className="book">
         <div
           key={`${dateKey}-${page?.id ?? 'blank'}`}
-          className={`paper flip-${flip} paper-${textSize}`}
+          className={`paper flip-${flip}`}
         >
           {/* رأس الورقة */}
           <header className="paper-head">
@@ -697,12 +779,26 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
           <button
             type="button"
-            className={`line-tool${isBold(focusedRow.block.content) ? ' active-tool' : ''}`}
-            onClick={() => toggleBoldBlock(focusedRow.block)}
+            className="line-tool"
+            onClick={() => applyBoldToFocusedSelection(focusedRow.block)}
             title="خط عريض (Ctrl+B)"
           >
             <BoldIcon size={19} /> عريض
           </button>
+
+          <div className="line-size-tools" aria-label="حجم النص المحدد">
+            {INLINE_TEXT_SIZE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className="line-size-tool"
+                title={option.title}
+                onClick={() => applySizeToFocusedSelection(focusedRow.block, option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
 
           {focusedRow.depth === 0 ? (
             <button
@@ -749,8 +845,7 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
   const canAcceptDrop = canDropOn?.(block) ?? false;
   const isDropTarget = dropTargetId === block.id && canAcceptDrop;
 
-  // محتوى العرض: إذا لم يكن السطر مركّزاً نزيل ** من العرض
-  const displayValue = block.content;
+  const displayValue = contentToHtml(block.content);
 
   return (
     <div
@@ -814,15 +909,15 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
           <div className="line-gutter-spacer" />
         )}
       </div>
-      <textarea
+      <div
         ref={refCb}
-        className={`line-input${bold ? ' bold-text' : ''}`}
-        value={displayValue}
-        rows={1}
-        placeholder={isTask ? 'مهمة…' : ''}
-        onChange={(e) => {
-          autoGrow(e.target);
-          onChange(block, e.target.value);
+        className={`line-input rich-line-input${bold ? ' bold-text' : ''}`}
+        contentEditable
+        suppressContentEditableWarning
+        data-placeholder={isTask ? 'مهمة…' : ''}
+        dangerouslySetInnerHTML={{ __html: displayValue }}
+        onInput={(e) => {
+          onChange(block, e.currentTarget.innerHTML);
         }}
         onKeyDown={(e) => onKeyDown(e, row)}
         onFocus={() => onFocus(block.id)}
@@ -831,6 +926,13 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
     </div>
   );
 }
+
+
+
+
+
+
+
 
 
 

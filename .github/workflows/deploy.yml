@@ -1,4 +1,4 @@
-# نشر تلقائي إلى GitHub Pages عند كل دفعة إلى main
+﻿# نشر تلقائي إلى GitHub Pages عند كل دفعة إلى main
 # يتطلب (مرة واحدة):
 #  1. Settings → Pages → Source: GitHub Actions
 #  2. Settings → Secrets and variables → Actions → إضافة السرّين:
@@ -44,7 +44,8 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: docs
 
       - id: deployment
         uses: actions/deploy-pages@v4
+
