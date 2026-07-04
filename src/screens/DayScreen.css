@@ -416,7 +416,8 @@
 .line-toolbar {
   position: fixed;
   inset-inline: var(--space-3);
-  bottom: calc(max(var(--keyboard-inset), calc(var(--tabbar-height) + var(--safe-bottom))) + 10px);
+  top: var(--toolbar-top, auto);
+  bottom: auto;
   z-index: 60;
   max-width: 520px;
   margin-inline: auto;
@@ -555,7 +556,7 @@
 .paper-line.sub .rich-size-xl { font-size: 20px; }
 
 .line-toolbar {
-  overflow-x: auto;
+  overflow: visible;
   justify-content: flex-start;
   scrollbar-width: none;
 }
@@ -575,10 +576,11 @@
 }
 
 .line-size-popover {
-  position: fixed;
+  position: absolute;
   inset-inline-start: 50%;
-  bottom: calc(max(var(--keyboard-inset), calc(var(--tabbar-height) + var(--safe-bottom))) + 66px);
-  transform: translateX(-50%);
+  top: auto;
+  bottom: calc(100% + 8px);
+  transform: none;
   display: grid;
   grid-template-columns: repeat(2, minmax(62px, 1fr));
   gap: 4px;
@@ -615,6 +617,10 @@
   }
 
 }
+
+
+
+
 
 
 

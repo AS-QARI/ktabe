@@ -159,6 +159,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [dropTargetId, setDropTargetId] = useState(null);
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
+  const [toolbarTop, setToolbarTop] = useState(0);
 
   const lastEditRef = useRef(0);
   const saveTimers = useRef(new Map());
@@ -189,6 +190,37 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   useEffect(() => {
     setLocalPageMeta(readLocalPageMeta(dateKey));
   }, [dateKey]);
+
+  useEffect(() => {
+    const updateMobileChrome = () => {
+      const viewport = window.visualViewport;
+      const docHeight = document.documentElement.clientHeight || window.innerHeight;
+      const viewportHeight = viewport?.height ?? window.innerHeight;
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const layoutHeight = Math.max(window.innerHeight, docHeight);
+      const inset = Math.max(0, layoutHeight - viewportHeight - viewportTop);
+      const toolbarHeight = 58;
+      const closedBottomReserve = 62;
+      const openBottomReserve = 10;
+      const bottomReserve = inset > 40 ? openBottomReserve : closedBottomReserve;
+      const top = Math.max(8, Math.round(viewportTop + viewportHeight - toolbarHeight - bottomReserve));
+
+      setKeyboardInset(Math.round(inset));
+      setToolbarTop(top);
+    };
+
+    updateMobileChrome();
+    window.addEventListener('resize', updateMobileChrome);
+    window.addEventListener('orientationchange', updateMobileChrome);
+    window.visualViewport?.addEventListener('resize', updateMobileChrome);
+    window.visualViewport?.addEventListener('scroll', updateMobileChrome);
+    return () => {
+      window.removeEventListener('resize', updateMobileChrome);
+      window.removeEventListener('orientationchange', updateMobileChrome);
+      window.visualViewport?.removeEventListener('resize', updateMobileChrome);
+      window.visualViewport?.removeEventListener('scroll', updateMobileChrome);
+    };
+  }, []);
 
   // تزامن لحظي بين الأجهزة — يتوقف مؤقتاً أثناء الكتابة المحلية
   useEffect(() => {
@@ -602,7 +634,11 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   return (
     <main
       className="screen day-screen"
-      style={{ '--keyboard-inset': `${keyboardInset}px` }}
+      style={{
+        '--keyboard-inset': `${keyboardInset}px`,
+        '--toolbar-top': `${toolbarTop}px`,
+        '--size-popover-top': `${Math.max(8, toolbarTop - 104)}px`,
+      }}
     >
       {/* شريط علوي */}
       <div className="day-topbar">
@@ -985,6 +1021,10 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
     </div>
   );
 }
+
+
+
+
 
 
 
