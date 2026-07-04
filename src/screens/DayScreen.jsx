@@ -161,6 +161,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [localPageMeta, setLocalPageMeta] = useState(() => readLocalPageMeta(dateKey));
   const [draggingId, setDraggingId] = useState(null);
   const [dropTargetId, setDropTargetId] = useState(null);
+  const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
 
   const lastEditRef = useRef(0);
   const saveTimers = useRef(new Map());
@@ -786,18 +787,35 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             <BoldIcon size={19} /> عريض
           </button>
 
-          <div className="line-size-tools" aria-label="حجم النص المحدد">
-            {INLINE_TEXT_SIZE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className="line-size-tool"
-                title={option.title}
-                onClick={() => applySizeToFocusedSelection(focusedRow.block, option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
+          <div className="line-size-menu">
+            <button
+              type="button"
+              className={`line-tool size-menu-trigger${sizeMenuOpen ? ' active-tool' : ''}`}
+              aria-haspopup="menu"
+              aria-expanded={sizeMenuOpen}
+              onClick={() => setSizeMenuOpen((open) => !open)}
+            >
+              الحجم
+            </button>
+            {sizeMenuOpen && (
+              <div className="line-size-popover" role="menu">
+                {INLINE_TEXT_SIZE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className="line-size-tool"
+                    role="menuitem"
+                    title={option.title}
+                    onClick={() => {
+                      applySizeToFocusedSelection(focusedRow.block, option.value);
+                      setSizeMenuOpen(false);
+                    }}
+                  >
+                    {option.title.replace('نص ', '')}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {focusedRow.depth === 0 ? (
@@ -926,6 +944,7 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
     </div>
   );
 }
+
 
 
 

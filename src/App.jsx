@@ -5,6 +5,15 @@ import { isUnlocked, saveUnlock } from './lib/session';
 import PinScreen from './screens/PinScreen';
 import AppShell from './components/AppShell';
 
+function withTimeout(promise, ms, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error(message)), ms);
+    }),
+  ]);
+}
+
 /**
  * بوابة التطبيق — تدير حالة القفل:
  *  checking: نستعلم من القاعدة هل هناك رمز مُعدّ أصلاً
@@ -23,7 +32,11 @@ export default function App() {
       return;
     }
     let cancelled = false;
-    hasPin()
+    withTimeout(
+      hasPin(),
+      10000,
+      'انتهت مهلة الاتصال بـ Supabase. تأكد من رابط المشروع والمفتاح ومن أن GitHub Pages يستخدم النسخة الجديدة.'
+    )
       .then((exists) => {
         if (!cancelled) setGate(exists ? 'locked' : 'setup');
       })
@@ -79,6 +92,8 @@ export default function App() {
 
   return <AppShell />;
 }
+
+
 
 
 
