@@ -219,6 +219,8 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  padding-bottom: calc(var(--keyboard-inset, 0px) + 84px);
+  scroll-padding-bottom: calc(var(--keyboard-inset, 0px) + 110px);
   /* تخصيص شريط التمرير ليكون خفياً */
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.08) transparent;
@@ -414,7 +416,7 @@
 .line-toolbar {
   position: fixed;
   inset-inline: var(--space-3);
-  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 10px);
+  bottom: calc(max(var(--keyboard-inset), calc(var(--tabbar-height) + var(--safe-bottom))) + 10px);
   z-index: 60;
   max-width: 520px;
   margin-inline: auto;
@@ -522,6 +524,12 @@
   white-space: pre-wrap;
   word-break: break-word;
   cursor: text;
+  direction: rtl;
+  unicode-bidi: plaintext;
+  text-align: right;
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
 }
 
 .rich-line-input:empty::before {
@@ -567,9 +575,9 @@
 }
 
 .line-size-popover {
-  position: absolute;
+  position: fixed;
   inset-inline-start: 50%;
-  bottom: calc(100% + 8px);
+  bottom: calc(max(var(--keyboard-inset), calc(var(--tabbar-height) + var(--safe-bottom))) + 66px);
   transform: translateX(-50%);
   display: grid;
   grid-template-columns: repeat(2, minmax(62px, 1fr));
@@ -582,6 +590,7 @@
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 80;
 }
 
 .line-size-tool {
@@ -606,4 +615,7 @@
   }
 
 }
+
+
+
 

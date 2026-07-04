@@ -69,6 +69,7 @@ function escapeHtml(value) {
 
 function sanitizeRichHtml(content) {
   return content
+    .replace(/\u200b/g, '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/\s+on\w+=("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
@@ -112,12 +113,7 @@ function applyInlineTextSize(el, size) {
 
   const span = document.createElement('span');
   span.className = `rich-size-${size}`;
-  if (range.collapsed) {
-    span.appendChild(document.createTextNode('\u200b'));
-    range.insertNode(span);
-    placeCaretAtEnd(span);
-    return true;
-  }
+  if (range.collapsed) return false;
 
   span.appendChild(range.extractContents());
   range.insertNode(span);
@@ -162,6 +158,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [draggingId, setDraggingId] = useState(null);
   const [dropTargetId, setDropTargetId] = useState(null);
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
 
   const lastEditRef = useRef(0);
   const saveTimers = useRef(new Map());
@@ -573,8 +570,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     if (!el) return;
     el.focus();
     if (!selectionBelongsTo(el)) placeCaretAtEnd(el);
-    applyInlineTextSize(el, size);
-    saveFocusedEditor(block);
+    if (applyInlineTextSize(el, size)) {
+      saveFocusedEditor(block);
+    }
   };
 
   /* ================= التنقل بين الأيام ================= */
@@ -602,7 +600,10 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const isToday = dateKey === todayKey();
 
   return (
-    <main className="screen day-screen">
+    <main
+      className="screen day-screen"
+      style={{ '--keyboard-inset': `${keyboardInset}px` }}
+    >
       {/* شريط علوي */}
       <div className="day-topbar">
         <input
@@ -864,6 +865,24 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
   const isDropTarget = dropTargetId === block.id && canAcceptDrop;
 
   const displayValue = contentToHtml(block.content);
+  const editorRef = useRef(null);
+  const focusedRef = useRef(false);
+
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el || focusedRef.current) return;
+    const nextHtml = contentToHtml(block.content);
+    if (el.innerHTML !== nextHtml) el.innerHTML = nextHtml;
+  }, [block.id, block.content]);
+
+  const setEditorRef = (el) => {
+    editorRef.current = el;
+    refCb(el);
+    if (el && el.dataset.blockId !== block.id) {
+      el.dataset.blockId = block.id;
+      el.innerHTML = displayValue;
+    }
+  };
 
   return (
     <div
@@ -928,22 +947,49 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
         )}
       </div>
       <div
-        ref={refCb}
+        ref={setEditorRef}
         className={`line-input rich-line-input${bold ? ' bold-text' : ''}`}
         contentEditable
         suppressContentEditableWarning
         data-placeholder={isTask ? 'مهمة…' : ''}
-        dangerouslySetInnerHTML={{ __html: displayValue }}
+        dir="rtl"
+        lang="ar"
+        spellCheck="true"
+        role="textbox"
+        aria-multiline="false"
         onInput={(e) => {
-          onChange(block, e.currentTarget.innerHTML);
+          onChange(block, sanitizeRichHtml(e.currentTarget.innerHTML));
+        }}
+        onPaste={(e) => {
+          e.preventDefault();
+          const text = e.clipboardData.getData('text/plain');
+          document.execCommand('insertText', false, text);
         }}
         onKeyDown={(e) => onKeyDown(e, row)}
-        onFocus={() => onFocus(block.id)}
-        onBlur={onBlur}
+        onFocus={(e) => {
+          focusedRef.current = true;
+          onFocus(block.id);
+          const target = e.currentTarget;
+          requestAnimationFrame(() => {
+            target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          });
+        }}
+        onBlur={(e) => {
+          focusedRef.current = false;
+          const clean = sanitizeRichHtml(e.currentTarget.innerHTML);
+          if (clean !== e.currentTarget.innerHTML) e.currentTarget.innerHTML = clean;
+          onChange(block, clean);
+          onBlur();
+        }}
       />
     </div>
   );
 }
+
+
+
+
+
 
 
 
