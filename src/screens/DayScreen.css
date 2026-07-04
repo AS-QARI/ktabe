@@ -625,3 +625,28 @@
 
 
 
+
+/* mobile writing toolbar: keep controls visible when iOS Safari shows the keyboard */
+@media (max-width: 680px) {
+  .line-toolbar {
+    top: calc(var(--safe-top) + 58px);
+    bottom: auto;
+    inset-inline: 10px;
+    max-width: none;
+    z-index: 220;
+    overflow-x: auto;
+    overflow-y: visible;
+    justify-content: flex-start;
+  }
+
+  .line-size-popover {
+    top: calc(100% + 8px);
+    bottom: auto;
+    inset-inline-start: 0;
+    transform: none;
+  }
+
+  .paper-lines {
+    scroll-padding-top: calc(var(--safe-top) + 136px);
+  }
+}
