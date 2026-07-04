@@ -10,7 +10,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const BASE_URL = 'http://localhost:5173';
+const BASE_URL = 'http://127.0.0.1:5173';
 const OUT_DIR = process.argv[2] ?? 'screenshots';
 const TABS = ['day', 'calendar', 'summary'];
 
@@ -64,3 +64,4 @@ if (errors.length) {
 } else {
   console.log('\nno console errors ✓');
 }
+

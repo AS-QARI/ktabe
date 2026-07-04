@@ -29,6 +29,7 @@
   color: var(--on-tint);
   display: grid;
   place-items: center;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.4); /* توهج الشعار */
 }
 
 .pin-title {
@@ -68,6 +69,7 @@
   background: var(--label);
   border-color: var(--label);
   transform: scale(1.15);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7); /* توهج النقطة النشطة */
 }
 
 /* اهتزاز أفقي عند الرمز الخاطئ — نفس لغة iOS البصرية للرفض */
@@ -137,6 +139,7 @@
 .pin-key-ok {
   background: var(--tint);
   color: var(--on-tint);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.4); /* توهج زر الدخول */
 }
 
 .pin-key-ok:disabled {

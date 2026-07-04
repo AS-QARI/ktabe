@@ -267,3 +267,14 @@ export function LockIcon(props) {
     </Svg>
   );
 }
+
+/** خط عريض — Bold */
+export function BoldIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M6 4h8a4 4 0 0 1 0 8H6z" strokeWidth={2} />
+      <path d="M6 12h9a4.5 4.5 0 0 1 0 9H6z" strokeWidth={2} />
+    </Svg>
+  );
+}
+

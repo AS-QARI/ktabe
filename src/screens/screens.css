@@ -70,6 +70,8 @@
   background: var(--surface);
   border-radius: var(--radius-m);
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
 }
 
 .card-list > * + * {
@@ -155,12 +157,14 @@
   color: var(--on-tint);
   font-size: 17px;
   font-weight: 600;
-  transition: opacity var(--dur-fast), transform var(--dur-fast) var(--ease-out);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.35); /* توهج أبيض مضيء */
+  transition: opacity var(--dur-fast), transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast);
 }
 
 .btn-primary:active {
-  opacity: 0.8;
+  opacity: 0.9;
   transform: scale(0.98);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.15);
 }
 
 .btn-primary:disabled {
@@ -190,6 +194,7 @@
   font-weight: 600;
   min-height: 44px;
   padding-inline: var(--space-2);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4); /* توهج ناعم للنص الملون */
 }
 
 .btn-text:disabled {

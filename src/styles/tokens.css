@@ -5,28 +5,28 @@
    ===================================================================== */
 
 :root {
-  /* الألوان — الوضع الفاتح: أبيض نظيف ولمسات حمراء */
-  --bg: #f7f6f4;                               /* خلفية دافئة كسطح مكتب */
-  --surface: #ffffff;                          /* الورق والبطاقات */
-  --fill: rgba(125, 115, 110, 0.1);            /* تعبئة خفيفة للأزرار والحقول */
-  --fill-strong: rgba(125, 115, 110, 0.2);     /* حالة الضغط */
-  --separator: rgba(80, 60, 55, 0.12);
-  --label: #262322;
-  --label-secondary: rgba(70, 60, 57, 0.62);
-  --label-tertiary: rgba(70, 60, 57, 0.32);
-  --tint: #e0392e;                             /* الأحمر — لون الهوية */
-  --on-tint: #ffffff;
-  --danger: #e0392e;
-  --success: #2fa14f;
-  --warning: #e08a00;
-  --bar-bg: rgba(255, 255, 255, 0.85);         /* خلفية الأشرطة شبه الشفافة */
+  /* الألوان — سمة داكنة فخمة متوهجة بالكامل */
+  --bg: #050506;                               /* خلفية سوداء عميقة */
+  --surface: #121214;                          /* أسطح وبطاقات بلون الفحم */
+  --fill: rgba(255, 255, 255, 0.08);           /* تعبئة خفيفة */
+  --fill-strong: rgba(255, 255, 255, 0.16);    /* حالة الضغط */
+  --separator: rgba(255, 255, 255, 0.1);
+  --label: #ffffff;                            /* أبيض ساطع للكتابة */
+  --label-secondary: rgba(255, 255, 255, 0.65);
+  --label-tertiary: rgba(255, 255, 255, 0.35);
+  --tint: #ffffff;                             /* أبيض متوهج للمؤشرات والتحديد */
+  --on-tint: #000000;
+  --danger: #ff4a4a;
+  --success: #3cd070;
+  --warning: #ff9f1a;
+  --bar-bg: rgba(8, 8, 10, 0.85);              /* خلفية شبه شفافة */
 
-  /* تسطير الورقة — أحمر خفيف كدفاتر المدرسة */
-  --rule: rgba(224, 57, 46, 0.14);             /* خطوط الأسطر الأفقية */
-  --rule-margin: rgba(224, 57, 46, 0.32);      /* خط الهامش العمودي */
-  --rule-h: 36px;                              /* ارتفاع السطر الواحد */
-  --paper: #ffffff;
-  --paper-edge: rgba(80, 60, 55, 0.14);        /* حافة الورقة */
+  /* تسطير الورقة — أبيض شفاف خفيف جداً وعصري */
+  --rule: rgba(255, 255, 255, 0.06);           /* خطوط الأسطر الأفقية */
+  --rule-margin: transparent;                  /* إزالة خط الهامش العمودي تماماً */
+  --rule-h: 38px;                              /* زيادة طفيفة لارتفاع السطر للقراءة المريحة */
+  --paper: #09090b;                            /* ورقة الكتابة باللون الأسود المائل للفحم */
+  --paper-edge: rgba(255, 255, 255, 0.08);     /* حافة ناعمة جداً */
 
   /* الطباعة: خطوط النظام نفسها — SF على آبل و Segoe على ويندوز */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text",
@@ -59,26 +59,26 @@
   --tabbar-height: 50px;
 }
 
-/* الوضع الداكن — يتبع إعداد النظام تلقائياً (نهج آبل الافتراضي) */
+/* سمة داكنة موحدة */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #121011;
-    --surface: #1e1b1c;
-    --fill: rgba(150, 135, 130, 0.22);
-    --fill-strong: rgba(150, 135, 130, 0.34);
-    --separator: rgba(150, 130, 125, 0.28);
-    --label: #f5f2f1;
-    --label-secondary: rgba(235, 225, 222, 0.6);
-    --label-tertiary: rgba(235, 225, 222, 0.3);
-    --tint: #ff5a4f;
-    --danger: #ff5a4f;
-    --success: #3dc466;
-    --warning: #ffa215;
-    --bar-bg: rgba(26, 23, 24, 0.85);
+    --bg: #050506;
+    --surface: #121214;
+    --fill: rgba(255, 255, 255, 0.08);
+    --fill-strong: rgba(255, 255, 255, 0.16);
+    --separator: rgba(255, 255, 255, 0.1);
+    --label: #ffffff;
+    --label-secondary: rgba(255, 255, 255, 0.65);
+    --label-tertiary: rgba(255, 255, 255, 0.35);
+    --tint: #ffffff;
+    --danger: #ff4a4a;
+    --success: #3cd070;
+    --warning: #ff9f1a;
+    --bar-bg: rgba(8, 8, 10, 0.85);
 
-    --rule: rgba(255, 90, 79, 0.17);
-    --rule-margin: rgba(255, 90, 79, 0.4);
-    --paper: #1e1b1c;
-    --paper-edge: rgba(150, 130, 125, 0.25);
+    --rule: rgba(255, 255, 255, 0.06);
+    --rule-margin: transparent;
+    --paper: #09090b;
+    --paper-edge: rgba(255, 255, 255, 0.08);
   }
 }

@@ -1,4 +1,5 @@
-/* شاشة الملخص: بطاقة اليوم (حلقة + نص) وشبكة الإحصائيات */
+/* شاشة الملخص: بطاقة اليوم (حلقة + نص) وشبكة الإحصائيات
+   الألوان: درجات من الفضي والأوف-وايت والرمادي الناعم — لا أبيض ناصع */
 
 .today-card {
   display: flex;
@@ -7,6 +8,8 @@
   background: var(--surface);
   border-radius: var(--radius-m);
   padding: var(--space-5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
 }
 
 .ring-wrap {
@@ -29,21 +32,24 @@
   stroke-linecap: round;
 }
 
-/* المسار: درجة أفتح من نفس لون التعبئة — الحالة تُقرأ على الحلقة كلها */
+/* مسار الحلقة الخلفية: رمادي فضي خفيف */
 .ring-track {
-  stroke: color-mix(in srgb, var(--tint) 18%, transparent);
+  stroke: rgba(148, 163, 184, 0.15);
 }
 
+/* مسار الإنجاز: رمادي فضي أفتح ومتوسط */
 .ring-fill {
-  stroke: var(--tint);
+  stroke: #94a3b8;
   transition: stroke-dashoffset 800ms var(--ease-out);
 }
 
-/* رقم البطل: كبير، بنفس خط الواجهة، بأرقام متناسبة (وليست tabular) */
+/* قيمة النسبة: أوف-وايت هادئ بدلاً من الأبيض الناصع */
 .ring-value {
   font-size: 30px;
   font-weight: 800;
   letter-spacing: -0.5px;
+  color: #cbd5e1;
+  text-shadow: none;
 }
 
 .today-text {
@@ -56,16 +62,18 @@
 .today-text h2 {
   font-size: 20px;
   font-weight: 700;
+  color: #e2e8f0;
 }
 
 .today-text p {
   font-size: 16px;
-  color: var(--label-secondary);
+  color: #94a3b8;
   line-height: 1.5;
 }
 
 .today-text strong {
-  color: var(--label);
+  color: #cbd5e1;
+  font-weight: 700;
 }
 
 /* ---------- شبكة الإحصائيات ---------- */
@@ -84,29 +92,35 @@
   background: var(--surface);
   border-radius: var(--radius-m);
   padding: var(--space-4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
 }
 
+/* أيقونة البطاقة: درجة فضية هادئة */
 .stat-icon {
-  color: var(--tint);
+  color: #94a3b8;
   display: grid;
   place-items: center;
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--tint) 12%, transparent);
+  background: rgba(148, 163, 184, 0.1);
   margin-bottom: var(--space-1);
 }
 
-/* القيمة بحبر النص الأساسي — اللون هوية الأيقونة، لا الرقم */
+/* القيمة: رمادي فضي متوسط */
 .stat-value {
   font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.4px;
   line-height: 1.1;
+  color: #cbd5e1;
+  text-shadow: none;
 }
 
+/* التسمية: رمادي خفيف */
 .stat-label {
   font-size: 14px;
-  color: var(--label-secondary);
+  color: #64748b;
   line-height: 1.4;
 }

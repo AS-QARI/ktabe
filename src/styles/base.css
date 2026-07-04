@@ -51,6 +51,7 @@ textarea {
 :focus-visible {
   outline: 2px solid var(--tint);
   outline-offset: 2px;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
 }
 
 /* ---------- هيكل التطبيق ---------- */
@@ -104,10 +105,12 @@ textarea {
   background: var(--tint);
   color: var(--on-tint);
   font-weight: 600;
-  transition: opacity var(--dur-fast), transform var(--dur-fast) var(--ease-out);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.35); /* توهج أبيض مضيء */
+  transition: opacity var(--dur-fast), transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast);
 }
 
 .btn-tint:active {
-  opacity: 0.8;
+  opacity: 0.9;
   transform: scale(0.97);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.15);
 }

@@ -4,6 +4,8 @@
   background: var(--surface);
   border-radius: var(--radius-m);
   padding: var(--space-2) var(--space-3) var(--space-3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
 }
 
 .calendar-nav {
@@ -134,7 +136,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 1.8px solid var(--tint);
+  border: 1.8px solid rgba(148, 163, 184, 0.6);
   background: transparent;
   color: transparent;
   display: grid;
@@ -191,6 +193,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
 }
 
 .countdown-top {
@@ -228,6 +232,7 @@
   color: var(--tint);
   font-variant-numeric: tabular-nums;
   letter-spacing: -1px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5); /* توهج رقم العداد */
 }
 
 .countdown-label {

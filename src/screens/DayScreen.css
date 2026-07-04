@@ -1,17 +1,36 @@
-/* شاشة "يومي" — الدفتر الورقي المسطّر بالأحمر */
+﻿/* شاشة "يومي" — الدفتر الورقي المسطّر */
 
 .day-screen {
-  padding-top: calc(var(--safe-top) + var(--space-2));
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--tabbar-height) - var(--safe-bottom));
+  padding: 0;
+  max-width: 680px;
+  margin-inline: auto;
+  position: relative;
+  overflow: hidden;
+}
+
+@media (min-width: 681px) {
+  .day-screen {
+    padding-top: calc(var(--safe-top) + var(--space-3));
+    height: auto;
+    min-height: calc(100dvh - var(--tabbar-height) - var(--safe-bottom));
+    overflow: visible;
+  }
 }
 
 .day-topbar {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding-block: var(--space-1) var(--space-3);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-4);
+  flex-shrink: 0;
+  z-index: 20;
 }
 
-/* منتقي التاريخ الحقيقي مخفي — زر التقويم يفتحه عبر showPicker */
+/* منتقي التاريخ الحقيقي مخفي */
 .day-date-input {
   position: absolute;
   width: 1px;
@@ -20,7 +39,6 @@
   pointer-events: none;
 }
 
-/* الإعدادات في أقصى اليسار — نفس موضعها في باقي الشاشات */
 .day-settings-btn {
   margin-inline-start: auto;
 }
@@ -28,65 +46,124 @@
 /* ---------- الكتاب والورقة ---------- */
 
 .book {
-  perspective: 1800px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  perspective: 1400px;
+  overflow: hidden;
 }
 
 .paper {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 62dvh;
+  flex: 1;
   background-color: var(--paper);
-  border: 0.5px solid var(--paper-edge);
-  /* كعب الكتاب على اليمين: زوايا اليمين حادة قليلاً واليسار دائرية كورقة */
-  border-start-start-radius: 4px;
-  border-end-start-radius: 4px;
-  border-start-end-radius: 16px;
-  border-end-end-radius: 16px;
-  /* أوراق مكدّسة تحتها — إيحاء الدفتر */
-  box-shadow:
-    0 1px 3px rgba(70, 35, 30, 0.1),
-    -2px 3px 0 -1px var(--paper),
-    -2px 3px 3px -1px rgba(70, 35, 30, 0.12),
-    -4px 6px 0 -2px var(--paper),
-    -4px 6px 5px -2px rgba(70, 35, 30, 0.1);
-  /* التسطير: خط هامش عمودي + أسطر أفقية حمراء خفيفة */
-  background-image:
-    linear-gradient(var(--rule-margin), var(--rule-margin)),
-    repeating-linear-gradient(
-      to bottom,
-      transparent 0 calc(var(--rule-h) - 1px),
-      var(--rule) calc(var(--rule-h) - 1px) var(--rule-h)
-    );
-  background-size: 1.5px 100%, 100% var(--rule-h);
-  background-position: calc(100% - 52px) 0, 0 0;
-  background-repeat: no-repeat, repeat;
   overflow: hidden;
+
+  /* التسطير الأفقي فقط — ناعم وخفيف وممتد */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 calc(var(--rule-h) - 1px),
+    var(--rule) calc(var(--rule-h) - 1px) var(--rule-h)
+  );
+  background-size: 100% var(--rule-h);
+  background-position: 0 0;
+  background-repeat: repeat;
 }
 
-/* قلب الصفحة كالكتاب: الورقة الجديدة تدور حول كعب الكتاب */
-.paper.flip-prev {
-  animation: flip-prev 500ms var(--ease-out);
-  transform-origin: 100% 50%;
-}
-
-@keyframes flip-prev {
-  from {
-    transform: rotateY(-65deg);
-    opacity: 0.3;
+/* على الكمبيوتر: كراسة متميزة بحواف */
+@media (min-width: 681px) {
+  .paper {
+    border: 1px solid var(--paper-edge);
+    border-start-start-radius: 4px;
+    border-end-start-radius: 4px;
+    border-start-end-radius: 16px;
+    border-end-end-radius: 16px;
+    box-shadow:
+      0 0 20px rgba(255, 255, 255, 0.04),
+      -2px 3px 0 -1px var(--paper),
+      -4px 6px 0 -2px var(--paper),
+      0 10px 30px rgba(0, 0, 0, 0.5);
   }
 }
+
+/* على الجوال: تملأ الشاشة edge-to-edge */
+@media (max-width: 680px) {
+  .paper {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .day-screen {
+    background-color: var(--paper);
+  }
+}
+
+/* ========== أنيميشن قلب الصفحة 3D — سريع وسلس ========== */
 
 .paper.flip-next {
-  animation: flip-next 500ms var(--ease-out);
-  transform-origin: 0% 50%;
+  animation: page-flip-next 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
+  transform-origin: right center;
+  transform-style: preserve-3d;
 }
 
-@keyframes flip-next {
-  from {
-    transform: rotateY(65deg);
-    opacity: 0.3;
+.paper.flip-prev {
+  animation: page-flip-prev 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+}
+
+@keyframes page-flip-next {
+  0% {
+    transform: rotateY(70deg) scale(0.97);
+    filter: brightness(0.65);
+    opacity: 0.7;
   }
+  100% {
+    transform: rotateY(0deg) scale(1);
+    filter: brightness(1);
+    opacity: 1;
+  }
+}
+
+@keyframes page-flip-prev {
+  0% {
+    transform: rotateY(-70deg) scale(0.97);
+    filter: brightness(0.65);
+    opacity: 0.7;
+  }
+  100% {
+    transform: rotateY(0deg) scale(1);
+    filter: brightness(1);
+    opacity: 1;
+  }
+}
+
+/* ومضة ضوء خاطفة فوق الورقة أثناء الانتقال */
+.paper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(0,0,0,0.3) 0%,
+    rgba(255,255,255,0.04) 50%,
+    rgba(0,0,0,0.3) 100%
+  );
+  opacity: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.paper.flip-next::after,
+.paper.flip-prev::after {
+  animation: shadow-flash 0.35s ease-out forwards;
+}
+
+@keyframes shadow-flash {
+  0% { opacity: 0.6; }
+  100% { opacity: 0; }
 }
 
 /* ---------- رأس الورقة ---------- */
@@ -112,6 +189,7 @@
   font-weight: 800;
   color: var(--tint);
   letter-spacing: -0.3px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
 }
 
 .paper-daynum {
@@ -134,52 +212,117 @@
   transform: scale(0.9);
 }
 
-/* ---------- السطور ---------- */
+/* ---------- مساحة الأسطر (قابلة للتمرير للأسفل) ---------- */
 
 .paper-lines {
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  /* تخصيص شريط التمرير ليكون خفياً */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
 }
 
+.paper-lines::-webkit-scrollbar {
+  width: 4px;
+}
+.paper-lines::-webkit-scrollbar-track {
+  background: transparent;
+}
+.paper-lines::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+}
+
+/* ---------- السطور ---------- */
+
 .paper-line {
+  position: relative;
   display: flex;
   align-items: flex-start;
   min-height: var(--rule-h);
 }
 
-/* الهامش الأيمن: تسكن فيه دائرة المهمة (بمحاذاة خط الهامش) */
+.paper-blank-line {
+  min-height: var(--rule-h);
+  width: 100%;
+  display: block;
+  cursor: text;
+}
+
+/* الهامش: يسكن فيه الدائرة فقط للمهام */
 .line-gutter {
-  width: 52px;
+  width: 44px;
   flex-shrink: 0;
   display: flex;
   justify-content: center;
-  padding-top: calc((var(--rule-h) - 24px) / 2);
+  padding-top: calc((var(--rule-h) - 22px) / 2);
 }
 
-/* السطر الفرعي: يزاح لداخل الصفحة تحت أبيه */
+/* النص العادي يبدأ من أول السطر؛ الهامش يظهر فقط للمهام */
+.paper-line:not(.is-task) .line-gutter {
+  display: none;
+}
+
+/* السطر الفرعي: أصغر ومربوط بصرياً بالمهمة الأساسية */
+.paper-line.sub {
+  position: relative;
+  padding-inline-start: 42px;
+}
+
+.paper-line.sub::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 20px;
+  top: calc(var(--rule-h) * -0.5);
+  width: 18px;
+  height: calc(var(--rule-h) - 8px);
+  border-inline-start: 1px solid rgba(255, 255, 255, 0.22);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+  border-end-start-radius: 8px;
+  pointer-events: none;
+}
+
+.paper-line.sub.last-sub::before {
+  height: calc(var(--rule-h) * 0.72);
+}
+
 .paper-line.sub .line-gutter {
-  width: 84px;
+  width: 26px;
   justify-content: flex-end;
-  padding-inline-end: 6px;
+  padding-inline-end: 4px;
+}
+
+/* حارس مكان شفاف لأسطر النص (بلا دائرة) */
+.line-gutter-spacer {
+  width: 24px;
+  height: 24px;
 }
 
 .line-circle {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  border: 1.8px solid var(--tint);
+  border: 1.8px solid rgba(255, 255, 255, 0.4);
   background: var(--paper);
   color: transparent;
   display: grid;
   place-items: center;
   transition: background var(--dur-fast), border-color var(--dur-fast),
-    opacity var(--dur-fast), transform var(--dur-med) var(--ease-spring);
+    transform var(--dur-med) var(--ease-spring);
 }
 
 .paper-line.sub .line-circle {
-  width: 19px;
-  height: 19px;
+  width: 16px;
+  height: 16px;
+  border-width: 1.4px;
+}
+
+.paper-line.sub .line-input {
+  font-size: 14px;
+  font-weight: 450;
+  color: var(--label-secondary);
 }
 
 .line-circle:active {
@@ -189,32 +332,33 @@
 .done .line-circle {
   background: var(--tint);
   color: var(--on-tint);
+  border-color: var(--tint);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
-/* دائرة التحويل الشبح على سطور النص: تظهر عند المرور أو التركيز */
-.line-circle.ghost {
-  border-color: var(--label-tertiary);
-  opacity: 0;
-}
-
-.paper-line:hover .line-circle.ghost,
-.paper-line:focus-within .line-circle.ghost {
-  opacity: 0.55;
-}
-
+/* حقل الكتابة — بلا إطار تركيز أو خلفية */
 .line-input {
   flex: 1;
   border: none;
   background: transparent;
   resize: none;
   outline: none;
+  box-shadow: none;
   overflow: hidden;
   min-height: var(--rule-h);
   font: inherit;
-  font-size: 17px;
-  line-height: var(--rule-h); /* النص يجلس على أسطر التسطير تماماً */
-  padding: 0 2px 0 14px;
+  font-size: 16px;
+  line-height: var(--rule-h);
+  padding: 0 14px;
   color: var(--label);
+  caret-color: var(--tint);
+  /* إزالة إطار التركيز تماماً */
+  -webkit-tap-highlight-color: transparent;
+}
+
+.line-input:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .is-task .line-input {
@@ -230,70 +374,39 @@
   color: var(--label-tertiary);
 }
 
+/* الخط العريض — Bold */
+.line-input.bold-text,
+.is-bold .line-input {
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
 /* بداية الكتابة في صفحة فارغة */
 .paper-starter {
   min-height: calc(var(--rule-h) * 3);
   text-align: start;
   color: var(--label-tertiary);
-  font-size: 17px;
+  font-size: 16px;
   line-height: var(--rule-h);
-  padding-inline: 66px 16px;
+  padding-inline: 14px;
   cursor: text;
+  width: 100%;
 }
 
-/* منطقة فارغة أسفل السطور — نقرة تضيف سطراً بالنهاية (كالورق الحقيقي) */
+/* منطقة فارغة أسفل السطور — للنقر وإضافة سطر */
 .paper-tail {
   flex: 1;
-  min-height: calc(var(--rule-h) * 3);
+  min-height: calc(var(--rule-h) * 6);
   cursor: text;
+  width: 100%;
+  display: block;
 }
 
-/* ---------- ذيل الورقة ---------- */
+/* ---------- ذيل الورقة (فارغ خفيف) ---------- */
 
 .paper-foot {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-1) var(--space-3) var(--space-2);
+  height: calc(var(--rule-h) * 0.5);
   flex-shrink: 0;
-}
-
-.page-dots {
-  display: flex;
-}
-
-.page-dot {
-  width: 26px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-}
-
-.page-dot::before {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--label-tertiary);
-  transition: background var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
-}
-
-.page-dot.active::before {
-  background: var(--tint);
-  transform: scale(1.25);
-}
-
-.page-no {
-  font-size: 13px;
-  color: var(--label-tertiary);
-}
-
-.add-page {
-  margin-inline-start: auto;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 15px;
 }
 
 /* ---------- شريط أدوات السطر ---------- */
@@ -314,8 +427,8 @@
   border: 0.5px solid var(--separator);
   border-radius: var(--radius-m);
   padding: 5px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
-  animation: toolbar-in 220ms var(--ease-out);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  animation: toolbar-in 180ms var(--ease-out);
 }
 
 @keyframes toolbar-in {
@@ -342,8 +455,14 @@
   color: var(--tint);
 }
 
-.line-tool:active {
+.line-tool:active,
+.line-tool.active-tool {
   background: var(--fill);
+}
+
+.line-tool.active-tool {
+  color: var(--tint);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
 }
 
 .line-tool:disabled {
@@ -354,3 +473,140 @@
 .line-tool.danger svg {
   color: var(--danger);
 }
+
+
+
+
+
+/* ---------- عنوان اليوم وحجم النص ---------- */
+
+.text-size-picker {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-inline-start: auto;
+  padding: 3px;
+  border: 0.5px solid var(--separator);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.text-size-option {
+  min-width: 34px;
+  min-height: 32px;
+  padding-inline: 7px;
+  border-radius: 999px;
+  color: var(--label-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.text-size-option.text-md { font-size: 12px; }
+.text-size-option.text-lg { font-size: 13px; }
+.text-size-option.text-xl { font-size: 14px; }
+
+.text-size-option.active {
+  background: var(--tint);
+  color: var(--on-tint);
+}
+
+.paper-head {
+  height: calc(var(--rule-h) * 3);
+  align-items: flex-start;
+  padding-top: 10px;
+}
+
+.paper-date {
+  min-width: 0;
+  flex: 1;
+}
+
+.day-title-input {
+  width: min(100%, 280px);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--label);
+  text-align: center;
+  font-size: 22px;
+  line-height: 1.15;
+  font-weight: 800;
+  padding: 2px 8px 0;
+  caret-color: var(--tint);
+}
+
+.day-title-input::placeholder {
+  color: var(--label-tertiary);
+}
+
+.paper-sm .line-input { font-size: 14px; }
+.paper-md .line-input { font-size: 16px; }
+.paper-lg .line-input { font-size: 19px; }
+.paper-xl .line-input { font-size: 22px; }
+
+.paper-lg .paper-line.sub .line-input { font-size: 16px; }
+.paper-xl .paper-line.sub .line-input { font-size: 18px; }
+
+@media (max-width: 460px) {
+  .day-topbar {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  .text-size-picker {
+    gap: 2px;
+  }
+
+  .text-size-option {
+    min-width: 30px;
+    padding-inline: 5px;
+    font-size: 10px;
+  }
+
+  .text-size-option.text-xl {
+    font-size: 12px;
+  }
+}
+
+/* ---------- سحب المهمات للفرعيات ---------- */
+
+.drag-handle {
+  width: 28px;
+  min-height: var(--rule-h);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--label-tertiary);
+  cursor: grab;
+  touch-action: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+  color: var(--tint);
+}
+
+.drag-handle span {
+  font-size: 16px;
+  line-height: 1;
+  transform: rotate(90deg);
+}
+
+.paper-line.dragging {
+  opacity: 0.45;
+}
+
+.paper-line.drop-target {
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 3px 0 0 var(--tint);
+}
+
+.paper-line.drop-target .line-input {
+  color: var(--tint);
+}
+
+.text-size-picker + .day-settings-btn {
+  margin-inline-start: 0;
+}
+

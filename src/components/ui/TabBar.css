@@ -41,4 +41,6 @@
 
 .tabbar-item.active {
   color: var(--tint);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
 }

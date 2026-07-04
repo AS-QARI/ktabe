@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getDayPages,
   createPage,
+  updatePage,
   createBlock,
   updateBlock,
   setBlockCompleted,
@@ -18,7 +19,6 @@ import {
 import {
   GearIcon,
   CalendarIcon,
-  PlusIcon,
   TrashIcon,
   CheckIcon,
   TextIcon,
@@ -27,11 +27,36 @@ import {
   OutdentIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  BoldIcon,
 } from '../components/ui/Icons';
 import './screens.css';
 import './DayScreen.css';
 
 const SYNC_TABLES = ['pages', 'blocks'];
+const TEXT_SIZE_OPTIONS = [
+  { value: 'sm', label: 'صغير', className: 'text-sm' },
+  { value: 'md', label: 'عادي', className: 'text-md' },
+  { value: 'lg', label: 'كبير', className: 'text-lg' },
+  { value: 'xl', label: 'أكبر', className: 'text-xl' },
+];
+
+function pageMetaKey(dateKey) {
+  return `kitabi-page-meta:${dateKey}`;
+}
+
+function readLocalPageMeta(dateKey) {
+  try {
+    return JSON.parse(localStorage.getItem(pageMetaKey(dateKey))) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLocalPageMeta(dateKey, patch) {
+  const next = { ...readLocalPageMeta(dateKey), ...patch };
+  localStorage.setItem(pageMetaKey(dateKey), JSON.stringify(next));
+  return next;
+}
 
 /** يمدد ارتفاع السطر مع التفاف النص — فيبقى النص جالساً على التسطير */
 function autoGrow(el) {
@@ -39,25 +64,40 @@ function autoGrow(el) {
   el.style.height = `${el.scrollHeight}px`;
 }
 
+/** استخراج محتوى Bold من النص: هل يحتوي على ** عند الطرفين؟ */
+function isBold(content) {
+  return content.startsWith('**') && content.endsWith('**') && content.length >= 5;
+}
+
+/** تطبيق/إزالة Bold على محتوى */
+function toggleBoldContent(content) {
+  if (isBold(content)) {
+    return content.slice(2, -2);
+  }
+  return `**${content}**`;
+}
+
 /**
- * شاشة "يومي" — دفتر ورقي:
- * صفحة مسطّرة بالأحمر لكل يوم، تكتب فيها بحرية سطراً تحت سطر،
- * وأي سطر يتحول لمهمة بدائرة، وتحت المهمة سطور فرعية (مهام جانبية
- * أو تعليقات). الأسهم تقلب الصفحة كالكتاب لليوم السابق/التالي،
- * واليوم الواحد يحتمل أكثر من صفحة.
+ * شاشة "يومي" — دفتر ورقي حديث:
+ * صفحة مسطّرة لكل يوم، تكتب فيها بحرية وتضغط في أي مكان للكتابة هناك.
+ * الكتابة تتمدد للأسفل تلقائياً دون الحاجة لصفحة جديدة.
  */
 export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [pages, setPages] = useState(null); // null = يحمّل
   const [error, setError] = useState(null);
-  const [pageIndex, setPageIndex] = useState(0);
   const [focusedId, setFocusedId] = useState(null);
   const [pendingFocus, setPendingFocus] = useState(null);
-  const [flip, setFlip] = useState('next'); // اتجاه حركة قلب الصفحة القادمة
+  const [flip, setFlip] = useState('next');
+  const [localPageMeta, setLocalPageMeta] = useState(() => readLocalPageMeta(dateKey));
+  const [draggingId, setDraggingId] = useState(null);
+  const [dropTargetId, setDropTargetId] = useState(null);
 
-  const lastEditRef = useRef(0); // حارس: لا يدع التزامن يمسح ما يُكتب الآن
+  const lastEditRef = useRef(0);
   const saveTimers = useRef(new Map());
+  const pageSaveTimer = useRef(null);
   const inputRefs = useRef(new Map());
   const dateInputRef = useRef(null);
+  const paperLinesRef = useRef(null);
 
   const markEdit = () => {
     lastEditRef.current = Date.now();
@@ -74,10 +114,13 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
   useEffect(() => {
     setPages(null);
-    setPageIndex(0);
     setFocusedId(null);
     load();
   }, [load]);
+
+  useEffect(() => {
+    setLocalPageMeta(readLocalPageMeta(dateKey));
+  }, [dateKey]);
 
   // تزامن لحظي بين الأجهزة — يتوقف مؤقتاً أثناء الكتابة المحلية
   useEffect(() => {
@@ -93,9 +136,17 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     };
   }, [load]);
 
-  const page =
-    pages && pages.length > 0 ? pages[Math.min(pageIndex, pages.length - 1)] : null;
+  // نستخدم أول صفحة فقط — الصفحة قابلة للتمرير بلا حدود
+  const page = pages && pages.length > 0 ? pages[0] : null;
   const blocks = useMemo(() => page?.blocks ?? [], [page]);
+  const pageMeta = {
+    ...localPageMeta,
+    ...(page?.title != null ? { title: page.title } : {}),
+    ...(page?.text_size != null ? { text_size: page.text_size } : {}),
+  };
+  const textSize = TEXT_SIZE_OPTIONS.some((opt) => opt.value === pageMeta.text_size)
+    ? pageMeta.text_size
+    : 'md';
 
   /** شجرة السطور مسطّحة: جذور بترتيبها ثم أبناء كل جذر */
   const rows = useMemo(() => {
@@ -110,6 +161,42 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         .sort((a, b) => a.position - b.position)
         .forEach((k) => out.push({ block: k, depth: 1 }));
     }
+    return out;
+  }, [blocks]);
+
+  const visualRows = useMemo(() => {
+    const roots = blocks
+      .filter((b) => !b.parent_id)
+      .sort((a, b) => a.position - b.position);
+    const out = [];
+    let line = 1;
+
+    for (const root of roots) {
+      const targetLine = Math.max(line, Math.round(root.position || line));
+      while (line < targetLine) {
+        out.push({ type: 'blank', key: `blank-${line}`, line });
+        line += 1;
+      }
+
+      out.push({ type: 'block', key: root.id, block: root, depth: 0, line });
+      line += 1;
+
+      blocks
+        .filter((b) => b.parent_id === root.id)
+        .sort((a, b) => a.position - b.position)
+        .forEach((child, index, children) => {
+          out.push({
+            type: 'block',
+            key: child.id,
+            block: child,
+            depth: 1,
+            isLastChild: index === children.length - 1,
+            line,
+          });
+          line += 1;
+        });
+    }
+
     return out;
   }, [blocks]);
 
@@ -133,6 +220,21 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       ps.map((p) => (p.id === page.id ? { ...p, blocks: fn(p.blocks) } : p))
     );
 
+  const savePagePatch = async (patch) => {
+    markEdit();
+    try {
+      const p = await ensurePage();
+      setLocalPageMeta(writeLocalPageMeta(dateKey, patch));
+      setPages((ps) => ps.map((x) => (x.id === p.id ? { ...x, ...patch } : x)));
+      clearTimeout(pageSaveTimer.current);
+      pageSaveTimer.current = setTimeout(() => {
+        updatePage(p.id, patch).catch(() => {});
+      }, 500);
+    } catch {
+      setLocalPageMeta(writeLocalPageMeta(dateKey, patch));
+    }
+  };
+
   const editContent = (block, value) => {
     markEdit();
     mutate((bs) => bs.map((b) => (b.id === block.id ? { ...b, content: value } : b)));
@@ -145,7 +247,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     );
   };
 
-  /** أول كتابة في يوم/صفحة فارغة: ننشئ الصفحة (إن لزم) وسطرها الأول */
+  /** أول كتابة في يوم فارغ: ننشئ الصفحة (إن لزم) وسطرها الأول */
   const startWriting = async () => {
     markEdit();
     try {
@@ -170,7 +272,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     }
   };
 
-  /** Enter: سطر جديد بعد الحالي، بنفس النوع ونفس المستوى (كسلوك القوائم) */
+  /** Enter: سطر جديد بعد الحالي، بنفس النوع ونفس المستوى */
   const insertAfter = async (row) => {
     markEdit();
     const { block } = row;
@@ -195,32 +297,51 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     }
   };
 
-  /** نقرة أسفل السطور: سطر نص رئيسي جديد في نهاية الصفحة */
-  const appendAtEnd = async () => {
-    if (rows.length === 0) {
-      startWriting();
-      return;
-    }
-    const last = rows[rows.length - 1];
-    if (last.depth === 0 && last.block.content === '') {
-      setPendingFocus(last.block.id);
-      return;
-    }
+  const ensurePage = async () => {
+    if (page) return page;
+    const created = await createPage(dateKey, 1);
+    const nextPage = { ...created, blocks: [] };
+    setPages([nextPage]);
+    return nextPage;
+  };
+
+  const insertTextAtLine = async (lineNo) => {
     markEdit();
-    const roots = blocks.filter((b) => !b.parent_id);
-    const position = Math.max(...roots.map((r) => r.position), 0) + 1;
     try {
+      const p = await ensurePage();
+      const desiredLine = Math.max(1, Math.round(lineNo));
       const b = await createBlock({
-        page_id: page.id,
+        page_id: p.id,
         kind: 'text',
         content: '',
-        position,
+        position: desiredLine,
       });
-      mutate((bs) => [...bs, b]);
+      setPages((ps) =>
+        ps.map((x) => (x.id === p.id ? { ...x, blocks: [...x.blocks, b] } : x))
+      );
       setPendingFocus(b.id);
     } catch {
       load();
     }
+  };
+
+  const lineFromPointer = (e) => {
+    const el = paperLinesRef.current;
+    if (!el) return visualRows.length + 1;
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    const ruleH = parseFloat(style.getPropertyValue('--rule-h')) || 38;
+    return Math.floor((e.clientY - rect.top + el.scrollTop) / ruleH) + 1;
+  };
+
+  const createLineFromPointer = (e) => {
+    insertTextAtLine(lineFromPointer(e));
+  };
+
+  /** نقرة في مساحة الورق الفارغة: سطر نص جديد في نهاية الصفحة */
+  const appendAtEnd = async () => {
+    const lastLine = visualRows.at(-1)?.line ?? rows.length;
+    insertTextAtLine(lastLine + 1);
   };
 
   const removeRow = (row) => {
@@ -248,7 +369,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     setBlockCompleted(block.id, done).catch(() => load());
   };
 
-  /** تحويل نص ↔ مهمة (التحويل لنص يمسح حالة الإكمال) */
+  /** تحويل نص ↔ مهمة */
   const convertKind = (block) => {
     markEdit();
     const patch =
@@ -259,32 +380,46 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     updateBlock(block.id, patch).catch(() => load());
   };
 
-  const canIndent =
-    focusedRow &&
-    focusedRow.depth === 0 &&
-    !blocks.some((b) => b.parent_id === focusedRow.block.id) &&
-    blocks.filter((b) => !b.parent_id).sort((a, b) => a.position - b.position)[0]?.id !==
-      focusedRow.block.id;
-
-  /** إزاحة السطر ليصبح فرعياً تحت السطر الرئيسي الذي قبله */
-  const indent = (row) => {
-    const { block } = row;
-    const roots = blocks
-      .filter((b) => !b.parent_id)
-      .sort((a, b) => a.position - b.position);
-    const idx = roots.findIndex((b) => b.id === block.id);
-    if (idx <= 0) return;
-    const parent = roots[idx - 1];
-    const kids = blocks.filter((b) => b.parent_id === parent.id);
-    const position = kids.length ? Math.max(...kids.map((k) => k.position)) + 1 : 1;
+  /** تبديل الخط العريض */
+  const toggleBoldBlock = (block) => {
     markEdit();
-    const patch = { parent_id: parent.id, position };
-    mutate((bs) => bs.map((b) => (b.id === block.id ? { ...b, ...patch } : b)));
-    updateBlock(block.id, patch).catch(() => load());
-    setPendingFocus(block.id);
+    const newContent = toggleBoldContent(block.content);
+    mutate((bs) => bs.map((b) => (b.id === block.id ? { ...b, content: newContent } : b)));
+    clearTimeout(saveTimers.current.get(block.id));
+    saveTimers.current.set(
+      block.id,
+      setTimeout(() => {
+        updateBlock(block.id, { content: newContent }).catch(() => {});
+      }, 700)
+    );
   };
 
-  /** إعادة سطر فرعي لمستوى رئيسي (يوضع بعد أبيه مباشرة) */
+  const canAddSubtask =
+    focusedRow && focusedRow.depth === 0 && focusedRow.block.kind === 'task';
+
+  const createSubtask = async (row) => {
+    const { block } = row;
+    if (block.kind !== 'task') return;
+    const kids = blocks
+      .filter((b) => b.parent_id === block.id)
+      .sort((a, b) => a.position - b.position);
+    const position = kids.length ? Math.max(...kids.map((k) => k.position)) + 1 : 1;
+    markEdit();
+    try {
+      const child = await createBlock({
+        page_id: page.id,
+        parent_id: block.id,
+        kind: 'task',
+        content: '',
+        position,
+      });
+      mutate((bs) => [...bs, child]);
+      setPendingFocus(child.id);
+    } catch {
+      load();
+    }
+  };
+
   const outdent = (row) => {
     const { block } = row;
     const parent = blocks.find((b) => b.id === block.parent_id);
@@ -304,6 +439,35 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     setPendingFocus(block.id);
   };
 
+  const canDropOn = (target) => {
+    if (!draggingId || !target || target.kind !== 'task' || target.parent_id) return false;
+    if (draggingId === target.id) return false;
+    const dragged = blocks.find((b) => b.id === draggingId);
+    if (!dragged || dragged.parent_id === target.id) return false;
+    return true;
+  };
+
+  const moveBlockToParent = (blockId, parentId) => {
+    const block = blocks.find((b) => b.id === blockId);
+    if (!block) return;
+    const parent = parentId ? blocks.find((b) => b.id === parentId) : null;
+    if (parentId && (!parent || !canDropOn(parent))) return;
+
+    const siblings = blocks.filter((b) => (b.parent_id ?? null) === (parentId ?? null) && b.id !== blockId);
+    const position = siblings.length ? Math.max(...siblings.map((b) => b.position || 0)) + 1 : 1;
+    const patch = { parent_id: parentId, position, kind: parentId ? 'task' : block.kind };
+
+    markEdit();
+    mutate((bs) => bs.map((b) => (b.id === blockId ? { ...b, ...patch } : b)));
+    updateBlock(blockId, patch).catch(() => load());
+    setPendingFocus(blockId);
+  };
+
+  const finishDrag = () => {
+    setDraggingId(null);
+    setDropTargetId(null);
+  };
+
   const onKeyDown = (e, row) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -311,10 +475,13 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     } else if (e.key === 'Backspace' && row.block.content === '' && rows.length > 1) {
       e.preventDefault();
       removeRow(row);
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault();
+      toggleBoldBlock(row.block);
     }
   };
 
-  /* ================= التنقل بين الأيام والصفحات ================= */
+  /* ================= التنقل بين الأيام ================= */
 
   const goDay = (delta) => {
     navigator.vibrate?.(8);
@@ -335,25 +502,12 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     else el.click();
   };
 
-  const addPage = async () => {
-    markEdit();
-    try {
-      const no = (pages[pages.length - 1]?.page_no ?? 0) + 1;
-      const p = await createPage(dateKey, no);
-      setFlip('next');
-      setPages((ps) => [...ps, { ...p, blocks: [] }]);
-      setPageIndex(pages.length);
-    } catch {
-      load();
-    }
-  };
-
   const d = parseDateKey(dateKey);
   const isToday = dateKey === todayKey();
 
   return (
     <main className="screen day-screen">
-      {/* شريط علوي نحيف: منتقي التاريخ يميناً، والإعدادات يساراً كباقي الشاشات */}
+      {/* شريط علوي */}
       <div className="day-topbar">
         <input
           ref={dateInputRef}
@@ -377,6 +531,19 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             العودة لليوم
           </button>
         )}
+        <div className="text-size-picker" aria-label="حجم النص">
+          {TEXT_SIZE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`text-size-option ${option.className}${textSize === option.value ? ' active' : ''}`}
+              aria-pressed={textSize === option.value}
+              onClick={() => savePagePatch({ text_size: option.value })}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           className="icon-btn day-settings-btn"
@@ -390,9 +557,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       <div className="book">
         <div
           key={`${dateKey}-${page?.id ?? 'blank'}`}
-          className={`paper flip-${flip}`}
+          className={`paper flip-${flip} paper-${textSize}`}
         >
-          {/* رأس الورقة: اليوم والتاريخ، وعن يمينه ويساره سهما قلب الصفحة */}
+          {/* رأس الورقة */}
           <header className="paper-head">
             <button
               type="button"
@@ -405,6 +572,12 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             <div className="paper-date">
               <span className="paper-weekday">{formatWeekday(d)}</span>
               <span className="paper-daynum">{formatDateWithYear(d)}</span>
+              <input
+                className="day-title-input"
+                value={pageMeta.title ?? ''}
+                placeholder="عنوان اليوم"
+                onChange={(e) => savePagePatch({ title: e.target.value })}
+              />
             </div>
             <button
               type="button"
@@ -428,81 +601,86 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
           )}
 
           {pages !== null && !error && (
-            <div className="paper-lines">
+            <div
+              className="paper-lines"
+              ref={paperLinesRef}
+              onClick={(e) => {
+                if (e.target === paperLinesRef.current) createLineFromPointer(e);
+              }}
+              onDragOver={(e) => {
+                if (draggingId && e.target === paperLinesRef.current) e.preventDefault();
+              }}
+              onDrop={(e) => {
+                if (!draggingId || e.target !== paperLinesRef.current) return;
+                e.preventDefault();
+                moveBlockToParent(draggingId, null);
+                finishDrag();
+              }}
+            >
               {rows.length === 0 ? (
-                <button type="button" className="paper-starter" onClick={startWriting}>
+                <button type="button" className="paper-starter" onClick={createLineFromPointer}>
                   اضغط هنا وابدأ الكتابة…
                 </button>
               ) : (
-                rows.map((row) => (
-                  <PaperLine
-                    key={row.block.id}
-                    row={row}
-                    refCb={(el) => {
-                      if (el) {
-                        inputRefs.current.set(row.block.id, el);
-                        autoGrow(el);
-                      } else {
-                        inputRefs.current.delete(row.block.id);
+                visualRows.map((item) =>
+                  item.type === 'blank' ? (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className="paper-blank-line"
+                      aria-label="سطر فارغ للكتابة"
+                      onClick={() => insertTextAtLine(item.line)}
+                    />
+                  ) : (
+                    <PaperLine
+                      key={item.block.id}
+                      row={item}
+                      isFocused={focusedId === item.block.id}
+                      refCb={(el) => {
+                        if (el) {
+                          inputRefs.current.set(item.block.id, el);
+                          autoGrow(el);
+                        } else {
+                          inputRefs.current.delete(item.block.id);
+                        }
+                      }}
+                      onChange={editContent}
+                      onKeyDown={onKeyDown}
+                      onToggle={toggleComplete}
+                      onConvert={convertKind}
+                      onFocus={setFocusedId}
+                      onBlur={() =>
+                        setTimeout(
+                          () => setFocusedId((f) => (f === item.block.id ? null : f)),
+                          150
+                        )
                       }
-                    }}
-                    onChange={editContent}
-                    onKeyDown={onKeyDown}
-                    onToggle={toggleComplete}
-                    onConvert={convertKind}
-                    onFocus={setFocusedId}
-                    onBlur={() =>
-                      setTimeout(
-                        () => setFocusedId((f) => (f === row.block.id ? null : f)),
-                        150
-                      )
-                    }
-                  />
-                ))
+                      draggingId={draggingId}
+                      dropTargetId={dropTargetId}
+                      canDropOn={canDropOn}
+                      onDragStart={(id) => setDraggingId(id)}
+                      onDragEnd={finishDrag}
+                      onDropOnTask={(id) => moveBlockToParent(draggingId, id)}
+                      onDropTarget={setDropTargetId}
+                    />
+                  )
+                )
               )}
-              {rows.length > 0 && (
-                <button
-                  type="button"
-                  className="paper-tail"
-                  aria-label="سطر جديد في نهاية الصفحة"
-                  onClick={appendAtEnd}
-                />
-              )}
+              <button
+                type="button"
+                className="paper-tail"
+                aria-label="سطر جديد في نهاية الصفحة"
+                onClick={createLineFromPointer}
+              />
             </div>
           )}
 
-          {/* ذيل الورقة: نقاط صفحات اليوم + إضافة صفحة */}
-          <footer className="paper-foot">
-            {pages && pages.length > 1 && (
-              <div className="page-dots" role="tablist" aria-label="صفحات اليوم">
-                {pages.map((p, i) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`page-dot${i === pageIndex ? ' active' : ''}`}
-                    aria-label={`صفحة ${p.page_no}`}
-                    onClick={() => {
-                      setFlip(i < pageIndex ? 'prev' : 'next');
-                      setPageIndex(i);
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-            {pages && pages.length > 1 && (
-              <span className="page-no">
-                صفحة {pageIndex + 1} من {pages.length}
-              </span>
-            )}
-            <button type="button" className="btn-text add-page" onClick={addPage}>
-              <PlusIcon size={16} />
-              صفحة جديدة
-            </button>
-          </footer>
+          {/* ذيل الورقة خفيف بدون صفحات متعددة */}
+          <footer className="paper-foot" />
         </div>
       </div>
 
-      {/* شريط أدوات السطر المُركّز — يطفو فوق شريط التنقل قرب الإبهام */}
+      {/* شريط أدوات السطر المُركّز */}
       {focusedRow && (
         <div className="line-toolbar" onPointerDown={(e) => e.preventDefault()}>
           <button
@@ -516,12 +694,22 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
               <><TaskCircleIcon size={19} /> مهمة</>
             )}
           </button>
+
+          <button
+            type="button"
+            className={`line-tool${isBold(focusedRow.block.content) ? ' active-tool' : ''}`}
+            onClick={() => toggleBoldBlock(focusedRow.block)}
+            title="خط عريض (Ctrl+B)"
+          >
+            <BoldIcon size={19} /> عريض
+          </button>
+
           {focusedRow.depth === 0 ? (
             <button
               type="button"
               className="line-tool"
-              disabled={!canIndent}
-              onClick={() => indent(focusedRow)}
+              disabled={!canAddSubtask}
+              onClick={() => createSubtask(focusedRow)}
             >
               <IndentIcon size={19} /> فرعي
             </button>
@@ -534,6 +722,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
               <OutdentIcon size={19} /> رئيسي
             </button>
           )}
+
           <button
             type="button"
             className="line-tool danger"
@@ -547,22 +736,67 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   );
 }
 
-/** سطر واحد على الورقة: هامش (دائرة مهمة أو نقطة تحويل) + نص يجلس على التسطير */
-function PaperLine({ row, refCb, onChange, onKeyDown, onToggle, onConvert, onFocus, onBlur }) {
+/**
+ * سطر واحد على الورقة.
+ * النصوص العادية: بلا دائرة على الإطلاق — نظيف كورقة حقيقية.
+ * المهام: دائرة التأشير فقط عند جانب السطر.
+ * النص العريض: يُخفى ** عند عدم التركيز ويُعرض بخط ثقيل.
+ */
+function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onConvert, onFocus, onBlur, draggingId, dropTargetId, canDropOn, onDragStart, onDragEnd, onDropOnTask, onDropTarget }) {
   const { block, depth } = row;
   const isTask = block.kind === 'task';
+  const bold = isBold(block.content);
+  const canAcceptDrop = canDropOn?.(block) ?? false;
+  const isDropTarget = dropTargetId === block.id && canAcceptDrop;
+
+  // محتوى العرض: إذا لم يكن السطر مركّزاً نزيل ** من العرض
+  const displayValue = block.content;
 
   return (
     <div
       className={[
         'paper-line',
         depth > 0 ? 'sub' : '',
+        row.isLastChild ? 'last-sub' : '',
         isTask ? 'is-task' : '',
         isTask && block.is_completed ? 'done' : '',
+        bold ? 'is-bold' : '',
+        isDropTarget ? 'drop-target' : '',
+        draggingId === block.id ? 'dragging' : '',
       ]
         .filter(Boolean)
         .join(' ')}
+      onDragOver={(e) => {
+        if (!canAcceptDrop) return;
+        e.preventDefault();
+        onDropTarget(block.id);
+      }}
+      onDragLeave={() => {
+        if (isDropTarget) onDropTarget(null);
+      }}
+      onDrop={(e) => {
+        if (!canAcceptDrop) return;
+        e.preventDefault();
+        onDropOnTask(block.id);
+        onDragEnd();
+      }}
     >
+      {isTask && (
+        <button
+          type="button"
+          className="drag-handle"
+          aria-label="سحب المهمة"
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', block.id);
+            onDragStart(block.id);
+          }}
+          onDragEnd={onDragEnd}
+        >
+          <span aria-hidden="true">⋮⋮</span>
+        </button>
+      )}
       <div className="line-gutter">
         {isTask ? (
           <button
@@ -576,23 +810,14 @@ function PaperLine({ row, refCb, onChange, onKeyDown, onToggle, onConvert, onFoc
             <CheckIcon size={12} />
           </button>
         ) : (
-          /* دائرة شبح: تظهر عند التركيز/المرور — نقرة تحوّل السطر لمهمة */
-          <button
-            type="button"
-            className="line-circle ghost"
-            aria-label="تحويل السطر لمهمة"
-            tabIndex={-1}
-            onPointerDown={(e) => e.preventDefault()}
-            onClick={() => onConvert(block)}
-          >
-            <CheckIcon size={12} />
-          </button>
+          /* لا دائرة شبحية — الورقة نظيفة */
+          <div className="line-gutter-spacer" />
         )}
       </div>
       <textarea
         ref={refCb}
-        className="line-input"
-        value={block.content}
+        className={`line-input${bold ? ' bold-text' : ''}`}
+        value={displayValue}
         rows={1}
         placeholder={isTask ? 'مهمة…' : ''}
         onChange={(e) => {
@@ -606,3 +831,26 @@ function PaperLine({ row, refCb, onChange, onKeyDown, onToggle, onConvert, onFoc
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
