@@ -626,11 +626,11 @@
 
 
 
-/* mobile writing toolbar: keep controls visible when iOS Safari shows the keyboard */
+/* mobile writing toolbar: pin it just above the on-screen keyboard */
 @media (max-width: 680px) {
   .line-toolbar {
-    top: calc(var(--safe-top) + 58px);
-    bottom: auto;
+    top: auto;
+    bottom: calc(var(--keyboard-inset, 0px) + max(10px, var(--safe-bottom)));
     inset-inline: 10px;
     max-width: none;
     z-index: 220;
@@ -640,13 +640,14 @@
   }
 
   .line-size-popover {
-    top: calc(100% + 8px);
-    bottom: auto;
+    top: auto;
+    bottom: calc(100% + 8px);
     inset-inline-start: 0;
     transform: none;
   }
 
   .paper-lines {
-    scroll-padding-top: calc(var(--safe-top) + 136px);
+    scroll-padding-bottom: calc(var(--keyboard-inset, 0px) + 132px);
   }
 }
+
