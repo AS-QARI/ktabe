@@ -792,6 +792,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
                       onDragEnd={finishDrag}
                       onDropOnTask={(id) => moveBlockToParent(draggingId, id)}
                       onDropTarget={setDropTargetId}
+                      onCircleDragStart={beginCircleDrag}
+                      onCircleDragMove={dragOverPoint}
+                      onCircleDragEnd={finishCircleDrag}
                     />
                   )
                 )
@@ -979,11 +982,18 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
             onDragEnd={onDragEnd}
             onPointerDown={(e) => {
               if (e.pointerType === 'mouse' && e.button !== 0) return;
+              // نلتقط العنصر والمؤشر الآن — currentTarget يصير null بعد انتهاء الحدث
+              const circleEl = e.currentTarget;
+              const pointerId = e.pointerId;
               circleDraggingRef.current = false;
               clearTimeout(longPressTimer.current);
               longPressTimer.current = setTimeout(() => {
                 circleDraggingRef.current = true;
-                e.currentTarget.setPointerCapture?.(e.pointerId);
+                try {
+                  circleEl.setPointerCapture?.(pointerId);
+                } catch {
+                  /* المؤشر لم يعد نشطاً — نكمل السحب بدون capture */
+                }
                 onCircleDragStart(block.id);
               }, 360);
             }}
