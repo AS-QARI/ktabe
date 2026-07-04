@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { hasPin } from './data/storage';
+import { supabaseConfigError } from './lib/supabaseClient';
 import { isUnlocked, saveUnlock } from './lib/session';
 import PinScreen from './screens/PinScreen';
 import AppShell from './components/AppShell';
@@ -12,11 +13,15 @@ import AppShell from './components/AppShell';
  *  unlocked: الجلسة مفتوحة (محفوظة محلياً من زيارة سابقة أو بعد إدخال صحيح)
  */
 export default function App() {
-  const [gate, setGate] = useState(() => (isUnlocked() ? 'unlocked' : 'checking'));
+  const [gate, setGate] = useState(() => (supabaseConfigError ? 'checking' : isUnlocked() ? 'unlocked' : 'checking'));
   const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
     if (gate !== 'checking') return;
+    if (supabaseConfigError) {
+      setLoadError(supabaseConfigError);
+      return;
+    }
     let cancelled = false;
     hasPin()
       .then((exists) => {
@@ -39,7 +44,7 @@ export default function App() {
     return (
       <div className="error-state">
         <h2>تعذّر الاتصال</h2>
-        <p>تأكد من اتصالك بالإنترنت ثم أعد المحاولة.</p>
+        <p>{loadError}</p>
         <button
           type="button"
           className="btn-tint"
@@ -74,3 +79,6 @@ export default function App() {
 
   return <AppShell />;
 }
+
+
+
