@@ -159,7 +159,6 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [dropTargetId, setDropTargetId] = useState(null);
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
-  const [toolbarTop, setToolbarTop] = useState(0);
 
   const lastEditRef = useRef(0);
   const saveTimers = useRef(new Map());
@@ -199,14 +198,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       const viewportTop = viewport?.offsetTop ?? 0;
       const layoutHeight = Math.max(window.innerHeight, docHeight);
       const inset = Math.max(0, layoutHeight - viewportHeight - viewportTop);
-      const toolbarHeight = 58;
-      const closedBottomReserve = 62;
-      const openBottomReserve = 10;
-      const bottomReserve = inset > 40 ? openBottomReserve : closedBottomReserve;
-      const top = Math.max(8, Math.round(viewportTop + viewportHeight - toolbarHeight - bottomReserve));
-
       setKeyboardInset(Math.round(inset));
-      setToolbarTop(top);
     };
 
     updateMobileChrome();
@@ -564,6 +556,26 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     setPendingFocus(blockId);
   };
 
+  const beginCircleDrag = (blockId) => {
+    navigator.vibrate?.(18);
+    setDraggingId(blockId);
+    setDropTargetId(null);
+  };
+
+  const dragOverPoint = (x, y) => {
+    if (!draggingId) return;
+    const el = document.elementFromPoint(x, y);
+    const line = el?.closest?.('.paper-line[data-block-id]');
+    const targetId = line?.dataset?.blockId;
+    const target = targetId ? blocks.find((b) => b.id === targetId) : null;
+    setDropTargetId(target && canDropOn(target) ? target.id : null);
+  };
+
+  const finishCircleDrag = () => {
+    if (draggingId && dropTargetId) moveBlockToParent(draggingId, dropTargetId);
+    finishDrag();
+  };
+
   const finishDrag = () => {
     setDraggingId(null);
     setDropTargetId(null);
@@ -636,8 +648,6 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       className="screen day-screen"
       style={{
         '--keyboard-inset': `${keyboardInset}px`,
-        '--toolbar-top': `${toolbarTop}px`,
-        '--size-popover-top': `${Math.max(8, toolbarTop - 104)}px`,
       }}
     >
       {/* شريط علوي */}
@@ -893,12 +903,14 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
  * المهام: دائرة التأشير فقط عند جانب السطر.
  * النص العريض: يُخفى ** عند عدم التركيز ويُعرض بخط ثقيل.
  */
-function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onConvert, onFocus, onBlur, draggingId, dropTargetId, canDropOn, onDragStart, onDragEnd, onDropOnTask, onDropTarget }) {
+function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onConvert, onFocus, onBlur, draggingId, dropTargetId, canDropOn, onDragStart, onDragEnd, onDropOnTask, onDropTarget, onCircleDragStart, onCircleDragMove, onCircleDragEnd }) {
   const { block, depth } = row;
   const isTask = block.kind === 'task';
   const bold = isBold(block.content);
   const canAcceptDrop = canDropOn?.(block) ?? false;
   const isDropTarget = dropTargetId === block.id && canAcceptDrop;
+  const longPressTimer = useRef(null);
+  const circleDraggingRef = useRef(false);
 
   const displayValue = contentToHtml(block.content);
   const editorRef = useRef(null);
@@ -922,6 +934,7 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
 
   return (
     <div
+      data-block-id={block.id}
       className={[
         'paper-line',
         depth > 0 ? 'sub' : '',
@@ -949,22 +962,6 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
         onDragEnd();
       }}
     >
-      {isTask && (
-        <button
-          type="button"
-          className="drag-handle"
-          aria-label="سحب المهمة"
-          draggable
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', block.id);
-            onDragStart(block.id);
-          }}
-          onDragEnd={onDragEnd}
-        >
-          <span aria-hidden="true">⋮⋮</span>
-        </button>
-      )}
       <div className="line-gutter">
         {isTask ? (
           <button
@@ -973,7 +970,47 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
             role="checkbox"
             aria-checked={block.is_completed}
             aria-label={block.is_completed ? 'إلغاء الإكمال' : 'إكمال المهمة'}
-            onClick={() => onToggle(block)}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', block.id);
+              onDragStart(block.id);
+            }}
+            onDragEnd={onDragEnd}
+            onPointerDown={(e) => {
+              if (e.pointerType === 'mouse' && e.button !== 0) return;
+              circleDraggingRef.current = false;
+              clearTimeout(longPressTimer.current);
+              longPressTimer.current = setTimeout(() => {
+                circleDraggingRef.current = true;
+                e.currentTarget.setPointerCapture?.(e.pointerId);
+                onCircleDragStart(block.id);
+              }, 360);
+            }}
+            onPointerMove={(e) => {
+              if (circleDraggingRef.current) onCircleDragMove(e.clientX, e.clientY);
+            }}
+            onPointerUp={() => {
+              clearTimeout(longPressTimer.current);
+              if (circleDraggingRef.current) {
+                circleDraggingRef.current = false;
+                onCircleDragEnd();
+              }
+            }}
+            onPointerCancel={() => {
+              clearTimeout(longPressTimer.current);
+              if (circleDraggingRef.current) {
+                circleDraggingRef.current = false;
+                onDragEnd();
+              }
+            }}
+            onClick={(e) => {
+              if (circleDraggingRef.current || draggingId === block.id) {
+                e.preventDefault();
+                return;
+              }
+              onToggle(block);
+            }}
           >
             <CheckIcon size={12} />
           </button>
@@ -1007,7 +1044,8 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
           onFocus(block.id);
           const target = e.currentTarget;
           requestAnimationFrame(() => {
-            target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            // 'nearest': لا تمرير إذا كان السطر ظاهراً — يبقى مكانه تحت إصبع المستخدم
+            target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
           });
         }}
         onBlur={(e) => {
@@ -1021,6 +1059,10 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
     </div>
   );
 }
+
+
+
+
 
 
 

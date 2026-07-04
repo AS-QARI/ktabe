@@ -416,8 +416,12 @@
 .line-toolbar {
   position: fixed;
   inset-inline: var(--space-3);
-  top: var(--toolbar-top, auto);
-  bottom: auto;
+  top: auto;
+  /* فوق الكيبورد عند فتحه، وفوق شريط التبويب عند إغلاقه */
+  bottom: max(
+    calc(var(--keyboard-inset, 0px) + 10px),
+    calc(var(--tabbar-height) + var(--safe-bottom) + 12px)
+  );
   z-index: 60;
   max-width: 520px;
   margin-inline: auto;
@@ -626,11 +630,9 @@
 
 
 
-/* mobile writing toolbar: pin it just above the on-screen keyboard */
+/* شريط الكتابة في الجوال: bottom موروث من القاعدة الأساسية (فوق الكيبورد/شريط التبويب) */
 @media (max-width: 680px) {
   .line-toolbar {
-    top: auto;
-    bottom: calc(var(--keyboard-inset, 0px) + max(10px, var(--safe-bottom)));
     inset-inline: 10px;
     max-width: none;
     z-index: 220;
@@ -651,3 +653,14 @@
   }
 }
 
+
+.line-circle {
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.line-circle:active {
+  cursor: grabbing;
+}
