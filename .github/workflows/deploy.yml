@@ -1,8 +1,7 @@
 ﻿# نشر تلقائي إلى GitHub Pages عند كل دفعة إلى main
-# يتطلب (مرة واحدة):
+# يتطلب مرة واحدة:
 #  1. Settings → Pages → Source: GitHub Actions
-#  2. Settings → Secrets and variables → Actions → إضافة السرّين:
-#     VITE_SUPABASE_URL و VITE_SUPABASE_PUBLISHABLE_KEY (القيم في .env.local)
+#  2. إعدادات Supabase العامة موجودة في .env.production
 name: Deploy to GitHub Pages
 
 on:
@@ -36,9 +35,6 @@ jobs:
       - run: npm ci
 
       - run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
       - uses: actions/configure-pages@v5
 
@@ -48,4 +44,5 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@v4
+
 
