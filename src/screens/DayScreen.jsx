@@ -127,7 +127,7 @@ function applyInlineTextSize(el, size) {
 /** يمدد ارتفاع السطر مع التفاف النص — فيبقى النص جالساً على التسطير */
 function autoGrow(el) {
   el.style.height = 'auto';
-  el.style.height = `${el.scrollHeight}px`;
+  el.style.height = `${Math.max(el.scrollHeight, el.offsetHeight)}px`;
 }
 
 /** استخراج محتوى Bold من النص: هل يحتوي على ** عند الطرفين؟ */
@@ -156,7 +156,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [flip, setFlip] = useState('next');
   const [localPageMeta, setLocalPageMeta] = useState(() => readLocalPageMeta(dateKey));
   const [draggingId, setDraggingId] = useState(null);
-  const [dropTargetId, setDropTargetId] = useState(null);
+  const [dropLine, setDropLine] = useState(null);
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
 
@@ -532,53 +532,59 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     setPendingFocus(block.id);
   };
 
-  const canDropOn = (target) => {
-    if (!draggingId || !target || target.kind !== 'task' || target.parent_id) return false;
-    if (draggingId === target.id) return false;
-    const dragged = blocks.find((b) => b.id === draggingId);
-    if (!dragged || dragged.parent_id === target.id) return false;
-    return true;
-  };
-
-  const moveBlockToParent = (blockId, parentId) => {
+  const moveTaskToLine = (blockId, lineNo) => {
     const block = blocks.find((b) => b.id === blockId);
-    if (!block) return;
-    const parent = parentId ? blocks.find((b) => b.id === parentId) : null;
-    if (parentId && (!parent || !canDropOn(parent))) return;
+    if (!block || block.kind !== 'task') return;
 
-    const siblings = blocks.filter((b) => (b.parent_id ?? null) === (parentId ?? null) && b.id !== blockId);
-    const position = siblings.length ? Math.max(...siblings.map((b) => b.position || 0)) + 1 : 1;
-    const patch = { parent_id: parentId, position, kind: parentId ? 'task' : block.kind };
+    const desiredLine = Math.max(1, Math.round(lineNo));
+    const shiftedRoots = blocks
+      .filter((b) => !b.parent_id && b.id !== blockId)
+      .map((b) => {
+        const line = Math.max(1, Math.round(b.position || 1));
+        return line >= desiredLine ? { ...b, position: line + 1 } : { ...b, position: line };
+      });
+    const shiftedById = new Map(shiftedRoots.map((b) => [b.id, b.position]));
+    const patch = { parent_id: null, position: desiredLine, kind: 'task' };
 
     markEdit();
-    mutate((bs) => bs.map((b) => (b.id === blockId ? { ...b, ...patch } : b)));
+    mutate((bs) =>
+      bs.map((b) => {
+        if (b.id === blockId) return { ...b, ...patch };
+        if (shiftedById.has(b.id)) return { ...b, position: shiftedById.get(b.id) };
+        return b;
+      })
+    );
     updateBlock(blockId, patch).catch(() => load());
+    shiftedRoots.forEach((b) => {
+      updateBlock(b.id, { position: b.position }).catch(() => load());
+    });
     setPendingFocus(blockId);
   };
 
   const beginCircleDrag = (blockId) => {
     navigator.vibrate?.(18);
     setDraggingId(blockId);
-    setDropTargetId(null);
+    setDropLine(null);
   };
 
   const dragOverPoint = (x, y) => {
     if (!draggingId) return;
     const el = document.elementFromPoint(x, y);
     const line = el?.closest?.('.paper-line[data-block-id]');
-    const targetId = line?.dataset?.blockId;
-    const target = targetId ? blocks.find((b) => b.id === targetId) : null;
-    setDropTargetId(target && canDropOn(target) ? target.id : null);
+    const lineNo = line?.dataset?.line
+      ? Number(line.dataset.line)
+      : lineFromPointer({ clientY: y });
+    setDropLine(lineNo);
   };
 
   const finishCircleDrag = () => {
-    if (draggingId && dropTargetId) moveBlockToParent(draggingId, dropTargetId);
+    if (draggingId && dropLine) moveTaskToLine(draggingId, dropLine);
     finishDrag();
   };
 
   const finishDrag = () => {
     setDraggingId(null);
-    setDropTargetId(null);
+    setDropLine(null);
   };
 
   const onKeyDown = (e, row) => {
@@ -738,12 +744,14 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
                 if (e.target === paperLinesRef.current) createLineFromPointer(e);
               }}
               onDragOver={(e) => {
-                if (draggingId && e.target === paperLinesRef.current) e.preventDefault();
+                if (!draggingId) return;
+                e.preventDefault();
+                setDropLine(lineFromPointer(e));
               }}
               onDrop={(e) => {
-                if (!draggingId || e.target !== paperLinesRef.current) return;
+                if (!draggingId) return;
                 e.preventDefault();
-                moveBlockToParent(draggingId, null);
+                moveTaskToLine(draggingId, lineFromPointer(e));
                 finishDrag();
               }}
             >
@@ -757,9 +765,20 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
                     <button
                       key={item.key}
                       type="button"
-                      className="paper-blank-line"
+                      className={`paper-blank-line${dropLine === item.line ? ' drop-target' : ''}`}
                       aria-label="سطر فارغ للكتابة"
                       onClick={() => insertTextAtLine(item.line)}
+                      onDragOver={(e) => {
+                        if (!draggingId) return;
+                        e.preventDefault();
+                        setDropLine(item.line);
+                      }}
+                      onDrop={(e) => {
+                        if (!draggingId) return;
+                        e.preventDefault();
+                        moveTaskToLine(draggingId, item.line);
+                        finishDrag();
+                      }}
                     />
                   ) : (
                     <PaperLine
@@ -786,12 +805,16 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
                         )
                       }
                       draggingId={draggingId}
-                      dropTargetId={dropTargetId}
-                      canDropOn={canDropOn}
-                      onDragStart={(id) => setDraggingId(id)}
+                      dropLine={dropLine}
+                      onDragStart={(id) => {
+                        setDraggingId(id);
+                        setDropLine(null);
+                      }}
                       onDragEnd={finishDrag}
-                      onDropOnTask={(id) => moveBlockToParent(draggingId, id)}
-                      onDropTarget={setDropTargetId}
+                      onDropOnLine={(lineNo) => {
+                        if (draggingId) moveTaskToLine(draggingId, lineNo);
+                      }}
+                      onDropLine={setDropLine}
                       onCircleDragStart={beginCircleDrag}
                       onCircleDragMove={dragOverPoint}
                       onCircleDragEnd={finishCircleDrag}
@@ -801,9 +824,20 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
               )}
               <button
                 type="button"
-                className="paper-tail"
+                className={`paper-tail${dropLine && dropLine > (visualRows.at(-1)?.line ?? 0) ? ' drop-target' : ''}`}
                 aria-label="سطر جديد في نهاية الصفحة"
                 onClick={createLineFromPointer}
+                onDragOver={(e) => {
+                  if (!draggingId) return;
+                  e.preventDefault();
+                  setDropLine(lineFromPointer(e));
+                }}
+                onDrop={(e) => {
+                  if (!draggingId) return;
+                  e.preventDefault();
+                  moveTaskToLine(draggingId, lineFromPointer(e));
+                  finishDrag();
+                }}
               />
             </div>
           )}
@@ -906,12 +940,11 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
  * المهام: دائرة التأشير فقط عند جانب السطر.
  * النص العريض: يُخفى ** عند عدم التركيز ويُعرض بخط ثقيل.
  */
-function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onConvert, onFocus, onBlur, draggingId, dropTargetId, canDropOn, onDragStart, onDragEnd, onDropOnTask, onDropTarget, onCircleDragStart, onCircleDragMove, onCircleDragEnd }) {
+function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onConvert, onFocus, onBlur, draggingId, dropLine, onDragStart, onDragEnd, onDropOnLine, onDropLine, onCircleDragStart, onCircleDragMove, onCircleDragEnd }) {
   const { block, depth } = row;
   const isTask = block.kind === 'task';
   const bold = isBold(block.content);
-  const canAcceptDrop = canDropOn?.(block) ?? false;
-  const isDropTarget = dropTargetId === block.id && canAcceptDrop;
+  const isDropTarget = dropLine === row.line && draggingId !== block.id;
   const longPressTimer = useRef(null);
   const circleDraggingRef = useRef(false);
 
@@ -924,6 +957,7 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
     if (!el || focusedRef.current) return;
     const nextHtml = contentToHtml(block.content);
     if (el.innerHTML !== nextHtml) el.innerHTML = nextHtml;
+    requestAnimationFrame(() => autoGrow(el));
   }, [block.id, block.content]);
 
   const setEditorRef = (el) => {
@@ -932,12 +966,14 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
     if (el && el.dataset.blockId !== block.id) {
       el.dataset.blockId = block.id;
       el.innerHTML = displayValue;
+      requestAnimationFrame(() => autoGrow(el));
     }
   };
 
   return (
     <div
       data-block-id={block.id}
+      data-line={row.line}
       className={[
         'paper-line',
         depth > 0 ? 'sub' : '',
@@ -951,17 +987,17 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
         .filter(Boolean)
         .join(' ')}
       onDragOver={(e) => {
-        if (!canAcceptDrop) return;
+        if (!draggingId || draggingId === block.id) return;
         e.preventDefault();
-        onDropTarget(block.id);
+        onDropLine(row.line);
       }}
       onDragLeave={() => {
-        if (isDropTarget) onDropTarget(null);
+        if (isDropTarget) onDropLine(null);
       }}
       onDrop={(e) => {
-        if (!canAcceptDrop) return;
+        if (!draggingId || draggingId === block.id) return;
         e.preventDefault();
-        onDropOnTask(block.id);
+        onDropOnLine(row.line);
         onDragEnd();
       }}
     >
@@ -1039,14 +1075,16 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
         lang="ar"
         spellCheck="true"
         role="textbox"
-        aria-multiline="false"
+        aria-multiline="true"
         onInput={(e) => {
+          autoGrow(e.currentTarget);
           onChange(block, sanitizeRichHtml(e.currentTarget.innerHTML));
         }}
         onPaste={(e) => {
           e.preventDefault();
           const text = e.clipboardData.getData('text/plain');
           document.execCommand('insertText', false, text);
+          requestAnimationFrame(() => autoGrow(e.currentTarget));
         }}
         onKeyDown={(e) => onKeyDown(e, row)}
         onFocus={(e) => {
@@ -1054,6 +1092,7 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
           onFocus(block.id);
           const target = e.currentTarget;
           requestAnimationFrame(() => {
+            autoGrow(target);
             // 'nearest': لا تمرير إذا كان السطر ظاهراً — يبقى مكانه تحت إصبع المستخدم
             target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
           });
@@ -1062,6 +1101,7 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
           focusedRef.current = false;
           const clean = sanitizeRichHtml(e.currentTarget.innerHTML);
           if (clean !== e.currentTarget.innerHTML) e.currentTarget.innerHTML = clean;
+          autoGrow(e.currentTarget);
           onChange(block, clean);
           onBlur();
         }}
@@ -1069,17 +1109,6 @@ function PaperLine({ row, isFocused, refCb, onChange, onKeyDown, onToggle, onCon
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 

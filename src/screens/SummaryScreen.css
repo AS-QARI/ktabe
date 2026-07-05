@@ -24,6 +24,8 @@
 .ring-wrap svg {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .ring-track,
@@ -123,4 +125,54 @@
   font-size: 14px;
   color: #64748b;
   line-height: 1.4;
+}
+
+@media (max-width: 420px) {
+  .today-card {
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .ring-wrap {
+    width: 116px;
+    height: 116px;
+  }
+
+  .ring-value {
+    font-size: 26px;
+  }
+
+  .today-text h2 {
+    font-size: 18px;
+  }
+
+  .today-text p {
+    font-size: 15px;
+  }
+
+  .stat-tile {
+    padding: var(--space-3);
+  }
+
+  .stat-value {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 390px) {
+  .today-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .today-text {
+    align-items: center;
+  }
+}
+
+@media (max-width: 360px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
 }

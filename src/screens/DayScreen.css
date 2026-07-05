@@ -1,4 +1,4 @@
-﻿/* شاشة "يومي" — الدفتر الورقي المسطّر */
+﻿/* شاشة "يومي" — ورقة حرة للكتابة والمهام */
 
 .day-screen {
   display: flex;
@@ -60,16 +60,7 @@
   flex: 1;
   background-color: var(--paper);
   overflow: hidden;
-
-  /* التسطير الأفقي فقط — ناعم وخفيف وممتد */
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0 calc(var(--rule-h) - 1px),
-    var(--rule) calc(var(--rule-h) - 1px) var(--rule-h)
-  );
-  background-size: 100% var(--rule-h);
-  background-position: 0 0;
-  background-repeat: repeat;
+  background-image: none;
 }
 
 /* على الكمبيوتر: كراسة متميزة بحواف */
@@ -247,10 +238,25 @@
 }
 
 .paper-blank-line {
+  position: relative;
   min-height: var(--rule-h);
   width: 100%;
   display: block;
   cursor: text;
+}
+
+.paper-line.drop-target::before,
+.paper-blank-line.drop-target::before,
+.paper-tail.drop-target::before {
+  content: '';
+  position: absolute;
+  inset-inline: 18px;
+  top: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.55);
+  pointer-events: none;
 }
 
 /* الهامش: يسكن فيه الدائرة فقط للمهام */
@@ -274,20 +280,15 @@
 }
 
 .paper-line.sub::before {
-  content: '';
-  position: absolute;
-  inset-inline-start: 20px;
-  top: calc(var(--rule-h) * -0.5);
-  width: 18px;
-  height: calc(var(--rule-h) - 8px);
-  border-inline-start: 1px solid rgba(255, 255, 255, 0.22);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
-  border-end-start-radius: 8px;
-  pointer-events: none;
+  display: none;
 }
 
 .paper-line.sub.last-sub::before {
   height: calc(var(--rule-h) * 0.72);
+}
+
+.paper-line.sub.drop-target::before {
+  display: block;
 }
 
 .paper-line.sub .line-gutter {
@@ -346,12 +347,13 @@
   resize: none;
   outline: none;
   box-shadow: none;
-  overflow: hidden;
+  overflow: visible;
+  height: auto;
   min-height: var(--rule-h);
   font: inherit;
   font-size: 16px;
-  line-height: var(--rule-h);
-  padding: 0 14px;
+  line-height: 1.55;
+  padding: 7px 14px;
   color: var(--label);
   caret-color: var(--tint);
   /* إزالة إطار التركيز تماماً */
@@ -397,6 +399,7 @@
 
 /* منطقة فارغة أسفل السطور — للنقر وإضافة سطر */
 .paper-tail {
+  position: relative;
   flex: 1;
   min-height: calc(var(--rule-h) * 6);
   cursor: text;
@@ -523,11 +526,35 @@
   }
 }
 
+@media (max-width: 420px) {
+  .paper-weekday {
+    font-size: 19px;
+  }
+
+  .paper-daynum {
+    font-size: 12px;
+  }
+
+  .page-turn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .line-gutter {
+    width: 40px;
+  }
+
+  .paper-line.sub {
+    padding-inline-start: 38px;
+  }
+}
+
 /* ---------- محرر غني داخل السطر ---------- */
 
 .rich-line-input {
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  word-break: normal;
   cursor: text;
   direction: rtl;
   unicode-bidi: plaintext;

@@ -4,6 +4,7 @@ import { supabaseConfigError } from './lib/supabaseClient';
 import { isUnlocked, saveUnlock } from './lib/session';
 import PinScreen from './screens/PinScreen';
 import AppShell from './components/AppShell';
+import DeviceFrame, { readPreviewFrame } from './components/preview/DeviceFrame';
 
 function withTimeout(promise, ms, message) {
   return Promise.race([
@@ -24,6 +25,7 @@ function withTimeout(promise, ms, message) {
 export default function App() {
   const [gate, setGate] = useState(() => (supabaseConfigError ? 'checking' : isUnlocked() ? 'unlocked' : 'checking'));
   const [loadError, setLoadError] = useState(null);
+  const previewFrame = readPreviewFrame() === 'iphone';
 
   useEffect(() => {
     if (gate !== 'checking') return;
@@ -53,8 +55,10 @@ export default function App() {
     setGate('unlocked');
   };
 
+  let content;
+
   if (loadError) {
-    return (
+    content = (
       <div className="error-state">
         <h2>تعذّر الاتصال</h2>
         <p>{loadError}</p>
@@ -71,17 +75,15 @@ export default function App() {
       </div>
     );
   }
-
-  if (gate === 'checking') {
-    return (
+  else if (gate === 'checking') {
+    content = (
       <div className="splash">
         <div className="spinner" />
       </div>
     );
   }
-
-  if (gate === 'setup' || gate === 'locked') {
-    return (
+  else if (gate === 'setup' || gate === 'locked') {
+    content = (
       <PinScreen
         key={gate}
         mode={gate === 'setup' ? 'setup' : 'enter'}
@@ -89,10 +91,12 @@ export default function App() {
       />
     );
   }
+  else {
+    content = <AppShell />;
+  }
 
-  return <AppShell />;
+  return <DeviceFrame enabled={previewFrame}>{content}</DeviceFrame>;
 }
-
 
 
 

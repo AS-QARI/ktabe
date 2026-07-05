@@ -256,3 +256,64 @@
   font-size: 13px;
   color: var(--label-tertiary);
 }
+
+@media (max-width: 420px) {
+  .calendar-card {
+    padding-inline: var(--space-3);
+  }
+
+  .calendar-title h2 {
+    font-size: 17px;
+  }
+
+  .calendar-day {
+    min-height: 44px;
+  }
+
+  .calendar-day-num {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .cal-task-text {
+    font-size: 16px;
+    padding-inline: var(--space-3) var(--space-2);
+  }
+
+  .countdown-card {
+    padding: var(--space-3);
+  }
+
+  .countdown-title {
+    font-size: 15px;
+  }
+
+  .countdown-value {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .countdown-num {
+    font-size: 34px;
+  }
+
+  .countdown-date {
+    line-height: 1.4;
+  }
+}
+
+@media (max-width: 390px) {
+  .calendar-grid {
+    gap: 1px;
+  }
+
+  .calendar-weekday {
+    font-size: 11px;
+  }
+
+  .open-day-btn {
+    font-size: 14px;
+    gap: 4px;
+  }
+}
