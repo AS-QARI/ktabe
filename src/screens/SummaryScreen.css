@@ -1,21 +1,131 @@
-/* شاشة الملخص: بطاقة اليوم (حلقة + نص) وشبكة الإحصائيات
-   الألوان: درجات من الفضي والأوف-وايت والرمادي الناعم — لا أبيض ناصع */
+/* شاشة الملخص: مختصرة ومكثفة قدر الإمكان لتقليل الحاجة للسكرول. */
 
-.today-card {
+.summary-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.summary-screen .screen-header {
+  padding-block: var(--space-1) var(--space-2);
+}
+
+.summary-hero,
+.summary-board,
+.compact-stat {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+.summary-hero,
+.summary-board {
+  border-radius: 22px;
+}
+
+.summary-hero::before,
+.summary-board::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at top right, rgba(173, 196, 228, 0.14), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.05), transparent 24%);
+}
+
+.summary-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.summary-hero-main {
   display: flex;
   align-items: center;
-  gap: var(--space-5);
-  background: var(--surface);
-  border-radius: var(--radius-m);
-  padding: var(--space-5);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  gap: var(--space-4);
+}
+
+.summary-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.today-copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.today-copy h2 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.45px;
+  line-height: 1.1;
+  color: #f8fafc;
+}
+
+.today-copy p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #b6c1d1;
+  max-width: 30ch;
+}
+
+.today-pills {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.metric-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 60px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.metric-pill-success {
+  background: linear-gradient(180deg, rgba(124, 214, 163, 0.14), rgba(124, 214, 163, 0.06));
+  border-color: rgba(124, 214, 163, 0.18);
+}
+
+.metric-pill-value {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.35px;
+  color: #f8fafc;
+}
+
+.metric-pill-label {
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 .ring-wrap {
   position: relative;
-  width: 132px;
-  height: 132px;
+  z-index: 1;
+  width: 104px;
+  height: 104px;
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -34,145 +144,215 @@
   stroke-linecap: round;
 }
 
-/* مسار الحلقة الخلفية: رمادي فضي خفيف */
 .ring-track {
-  stroke: rgba(148, 163, 184, 0.15);
+  stroke: rgba(163, 177, 196, 0.14);
 }
 
-/* مسار الإنجاز: رمادي فضي أفتح ومتوسط */
 .ring-fill {
-  stroke: #94a3b8;
+  stroke: #adc4e4;
+  filter: drop-shadow(0 0 10px rgba(173, 196, 228, 0.18));
   transition: stroke-dashoffset 800ms var(--ease-out);
 }
 
-/* قيمة النسبة: أوف-وايت هادئ بدلاً من الأبيض الناصع */
 .ring-value {
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 800;
-  letter-spacing: -0.5px;
-  color: #cbd5e1;
-  text-shadow: none;
-}
-
-.today-text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-.today-text h2 {
-  font-size: 20px;
-  font-weight: 700;
+  letter-spacing: -0.4px;
   color: #e2e8f0;
 }
 
-.today-text p {
-  font-size: 16px;
-  color: #94a3b8;
-  line-height: 1.5;
-}
-
-.today-text strong {
-  color: #cbd5e1;
-  font-weight: 700;
-}
-
-/* ---------- شبكة الإحصائيات ---------- */
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-}
-
-.stat-tile {
+.summary-board {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-1);
-  background: var(--surface);
-  border-radius: var(--radius-m);
+  gap: var(--space-3);
   padding: var(--space-4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
 }
 
-/* أيقونة البطاقة: درجة فضية هادئة */
-.stat-icon {
-  color: #94a3b8;
+.summary-board-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.summary-board-head h2 {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.25px;
+  color: #f8fafc;
+}
+
+.summary-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #b8c7dc;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.week-strip {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.week-strip-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.week-strip-track {
+  width: 100%;
+  height: 56px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 6px 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.week-strip-bar {
+  width: 100%;
+  max-width: 18px;
+  min-height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.34), rgba(148, 163, 184, 0.82));
+}
+
+.week-strip-bar.is-today {
+  background: linear-gradient(180deg, #d7e4f7, #adc4e4);
+  box-shadow: 0 0 14px rgba(173, 196, 228, 0.18);
+}
+
+.week-strip-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8b9ab0;
+}
+
+.compact-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.compact-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 82px;
+  padding: 10px;
+  border-radius: 16px;
+}
+
+.compact-stat-icon {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border-radius: 10px;
-  background: rgba(148, 163, 184, 0.1);
-  margin-bottom: var(--space-1);
+  color: #adc4e4;
+  background: rgba(173, 196, 228, 0.12);
 }
 
-/* القيمة: رمادي فضي متوسط */
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: -0.4px;
-  line-height: 1.1;
-  color: #cbd5e1;
-  text-shadow: none;
+.compact-stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  line-height: 1;
+  color: #f8fafc;
 }
 
-/* التسمية: رمادي خفيف */
-.stat-label {
-  font-size: 14px;
-  color: #64748b;
-  line-height: 1.4;
+.compact-stat-label {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #8fa0b7;
 }
 
 @media (max-width: 420px) {
-  .today-card {
-    gap: var(--space-4);
-    padding: var(--space-4);
+  .summary-screen {
+    gap: 10px;
+  }
+
+  .summary-hero,
+  .summary-board {
+    padding: var(--space-3);
+    border-radius: 20px;
+  }
+
+  .summary-hero-main {
+    gap: var(--space-3);
   }
 
   .ring-wrap {
-    width: 116px;
-    height: 116px;
+    width: 94px;
+    height: 94px;
   }
 
   .ring-value {
-    font-size: 26px;
+    font-size: 22px;
   }
 
-  .today-text h2 {
-    font-size: 18px;
+  .today-copy h2 {
+    font-size: 22px;
   }
 
-  .today-text p {
-    font-size: 15px;
+  .today-copy p {
+    font-size: 13px;
   }
 
-  .stat-tile {
-    padding: var(--space-3);
+  .metric-pill {
+    min-height: 56px;
+    padding: 9px 10px;
   }
 
-  .stat-value {
-    font-size: 24px;
+  .metric-pill-value {
+    font-size: 19px;
+  }
+
+  .summary-board-head h2 {
+    font-size: 17px;
+  }
+
+  .summary-chip {
+    font-size: 11px;
+  }
+
+  .week-strip-track {
+    height: 50px;
+  }
+
+  .compact-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compact-stat {
+    min-height: 74px;
   }
 }
 
 @media (max-width: 390px) {
-  .today-card {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
+  .summary-hero-main {
+    align-items: flex-start;
   }
 
-  .today-text {
-    align-items: center;
+  .today-copy h2 {
+    font-size: 20px;
   }
-}
 
-@media (max-width: 360px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
+  .today-pills {
+    gap: 8px;
   }
 }

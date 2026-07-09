@@ -258,6 +258,29 @@ export function OutdentIcon(props) {
   );
 }
 
+/** تحديد نص — أقواس زوايا حول سطر */
+export function SelectIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4 8V6.5A2.5 2.5 0 0 1 6.5 4H8" />
+      <path d="M16 4h1.5A2.5 2.5 0 0 1 20 6.5V8" />
+      <path d="M20 16v1.5a2.5 2.5 0 0 1-2.5 2.5H16" />
+      <path d="M8 20H6.5A2.5 2.5 0 0 1 4 17.5V16" />
+      <path d="M9 12h6" />
+    </Svg>
+  );
+}
+
+/** نسخ */
+export function CopyIcon(props) {
+  return (
+    <Svg {...props}>
+      <rect x="9" y="9" width="11" height="11" rx="2.5" />
+      <path d="M15 5.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h.5" />
+    </Svg>
+  );
+}
+
 /** قفل */
 export function LockIcon(props) {
   return (
@@ -274,6 +297,69 @@ export function BoldIcon(props) {
     <Svg {...props}>
       <path d="M6 4h8a4 4 0 0 1 0 8H6z" strokeWidth={2} />
       <path d="M6 12h9a4.5 4.5 0 0 1 0 9H6z" strokeWidth={2} />
+    </Svg>
+  );
+}
+
+/** خط مائل — Italic */
+export function ItalicIcon(props) {
+  return (
+    <Svg strokeWidth={2} {...props}>
+      <path d="M10 4h8" />
+      <path d="M6 20h8" />
+      <path d="M14 4 10 20" />
+    </Svg>
+  );
+}
+
+/** تسطير — Underline */
+export function UnderlineIcon(props) {
+  return (
+    <Svg strokeWidth={2} {...props}>
+      <path d="M6.5 4v7a5.5 5.5 0 0 0 11 0V4" />
+      <path d="M5 20.5h14" />
+    </Svg>
+  );
+}
+
+/** يتوسطه خط — Strikethrough */
+export function StrikethroughIcon(props) {
+  return (
+    <Svg strokeWidth={2} {...props}>
+      <path d="M17.5 6.5c-.8-1.8-2.9-2.9-5.4-2.9-3 0-5.1 1.6-5.1 4 0 1.6 1 2.7 3 3.4" />
+      <path d="M9 17.5c.9 1.6 2.8 2.6 5 2.4 2.7-.2 4.5-1.8 4.3-4.1-.1-1.3-.9-2.2-2.3-2.9" />
+      <path d="M4 12h16" />
+    </Svg>
+  );
+}
+
+/** تنسيق النص — Aa بأسلوب شريط ملاحظات آبل */
+export function FormatIcon(props) {
+  return (
+    <Svg strokeWidth={2} {...props}>
+      <path d="m3 18.5 5-13 5 13" />
+      <path d="M4.9 13.7h6.2" />
+      <path d="M21 18.5v-7" />
+      <circle cx="18" cy="15.4" r="3" />
+    </Svg>
+  );
+}
+
+/** إخفاء لوحة المفاتيح — كيبورد مع سهم لأسفل */
+export function KeyboardHideIcon(props) {
+  return (
+    <Svg {...props}>
+      <rect x="2.5" y="3.5" width="19" height="11.5" rx="2.5" />
+      <path d="M6 7h.01" />
+      <path d="M9.7 7h.01" />
+      <path d="M13.4 7h.01" />
+      <path d="M17.1 7h.01" />
+      <path d="M6 10h.01" />
+      <path d="M9.7 10h.01" />
+      <path d="M13.4 10h.01" />
+      <path d="M17.1 10h.01" />
+      <path d="M8.5 12.5h7" />
+      <path d="m9.2 18.5 2.8 2.6 2.8-2.6" />
     </Svg>
   );
 }

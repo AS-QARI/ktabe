@@ -72,6 +72,12 @@ textarea {
 
 .device-preview-app .app-shell {
   padding-bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 36px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.device-preview-app .app-shell::-webkit-scrollbar {
+  display: none;
 }
 
 .device-preview-app .day-screen {

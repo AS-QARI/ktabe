@@ -1,11 +1,235 @@
 /* شاشة التقويم والعدادات */
 
-.calendar-card {
-  background: var(--surface);
-  border-radius: var(--radius-m);
-  padding: var(--space-2) var(--space-3) var(--space-3);
+.calendar-screen {
+  position: relative;
+  isolation: isolate;
+}
+
+.calendar-screen::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(255, 255, 255, 0.18), transparent 28%),
+    radial-gradient(circle at 86% 24%, rgba(92, 120, 255, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 38%);
+  opacity: 0.72;
+}
+
+.calendar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.countdown-spotlight {
+  position: relative;
+  overflow: hidden;
+  min-height: 210px;
+  border-radius: 30px;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background:
+    radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.28), transparent 26%),
+    radial-gradient(circle at 80% 24%, rgba(255, 255, 255, 0.12), transparent 24%),
+    linear-gradient(135deg, #25262d 0%, #111216 48%, #050506 100%);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.countdown-spotlight.now {
+  background:
+    radial-gradient(circle at 24% 18%, rgba(60, 208, 112, 0.34), transparent 28%),
+    linear-gradient(135deg, #17241d, #070908 70%);
+}
+
+.countdown-spotlight.past {
+  background:
+    radial-gradient(circle at 28% 16%, rgba(255, 255, 255, 0.16), transparent 28%),
+    linear-gradient(135deg, #1b1b1d, #080809 70%);
+}
+
+.countdown-spotlight.empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.spotlight-orbit {
+  position: absolute;
+  inset: auto -42px -66px auto;
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  filter: blur(0.2px);
+}
+
+.spotlight-orbit span {
+  position: absolute;
+  inset: 22px;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+.spotlight-orbit span:nth-child(2) {
+  inset: 52px;
+}
+
+.spotlight-orbit span:nth-child(3) {
+  inset: 82px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.spotlight-content {
+  position: relative;
+  max-width: 62%;
+}
+
+.spotlight-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding-inline: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.countdown-spotlight h2 {
+  margin-top: var(--space-3);
+  font-size: 25px;
+  line-height: 1.18;
+  font-weight: 850;
+  letter-spacing: -0.5px;
+}
+
+.countdown-spotlight p {
+  margin-top: var(--space-2);
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 14px;
+}
+
+.spotlight-number {
+  position: absolute;
+  inset-inline-end: 22px;
+  inset-block-end: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.spotlight-number strong {
+  font-size: 82px;
+  line-height: 0.86;
+  font-weight: 900;
+  letter-spacing: -5px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 26px rgba(255, 255, 255, 0.28);
+}
+
+.spotlight-number span {
+  margin-top: var(--space-2);
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.spotlight-state-text {
+  max-width: 150px;
+  font-size: 34px !important;
+  line-height: 1.1 !important;
+  letter-spacing: -1px !important;
+  text-align: end;
+}
+
+.spotlight-progress,
+.countdown-progress {
+  overflow: hidden;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.spotlight-progress {
+  position: absolute;
+  inset-inline: 22px;
+  inset-block-end: 18px;
+}
+
+.spotlight-progress span,
+.countdown-progress span {
+  display: block;
+  block-size: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.55), #fff);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.36);
+}
+
+.spotlight-action {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding-inline: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-weight: 750;
+}
+
+.calendar-insights {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+}
+
+.calendar-insight-pill {
+  min-width: 0;
+  border-radius: 18px;
+  padding: 10px 11px;
+  background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+}
+
+.calendar-insight-pill span,
+.calendar-section-title p {
+  display: block;
+  color: var(--label-tertiary);
+  font-size: 12px;
+}
+
+.calendar-insight-pill strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 20px;
+  line-height: 1.1;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-card,
+.selected-day-card,
+.countdown-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(18, 18, 20, 0.78);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(22px);
+}
+
+.calendar-card {
+  border-radius: 28px;
+  padding: var(--space-3) var(--space-3) var(--space-4);
 }
 
 .calendar-nav {
@@ -13,6 +237,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  padding-inline: 2px;
 }
 
 .calendar-title {
@@ -22,76 +247,89 @@
 }
 
 .calendar-title h2 {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 19px;
+  font-weight: 850;
+  letter-spacing: -0.2px;
 }
 
 .calendar-today-btn {
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
   margin-top: var(--space-2);
 }
 
 .calendar-weekday {
   text-align: center;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 750;
   color: var(--label-tertiary);
   padding-block: var(--space-1);
 }
 
-/* خلية يوم: ≥44px هدف لمس، رقم في دائرة + نقاط المهام تحته */
 .calendar-day {
-  min-height: 48px;
+  position: relative;
+  min-height: 54px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding-top: 3px;
-  gap: 2px;
-  border-radius: var(--radius-s);
-  transition: background var(--dur-fast);
+  gap: 3px;
+  border-radius: 18px;
+  padding-top: 5px;
+  transition:
+    background var(--dur-fast),
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast);
 }
 
 .calendar-day:active {
-  background: var(--fill);
+  transform: scale(0.95);
+}
+
+.calendar-day.has-tasks,
+.calendar-day.has-countdown {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.calendar-day.selected {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .calendar-day-num {
-  width: 30px;
-  height: 30px;
+  width: 31px;
+  height: 31px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   font-size: 15px;
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
   transition: background var(--dur-fast), color var(--dur-fast);
 }
 
-/* المحدد: تعبئة رمادية — اليوم الحالي: دائرة زرقاء ممتلئة (لغة تقويم آبل) */
-.calendar-day.selected .calendar-day-num {
-  background: var(--fill-strong);
-  font-weight: 600;
-}
-
 .calendar-day.today .calendar-day-num {
-  color: var(--tint);
-  font-weight: 700;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.42);
 }
 
 .calendar-day.today.selected .calendar-day-num {
-  background: var(--tint);
-  color: var(--on-tint);
+  background: #fff;
+  color: #000;
 }
 
 .calendar-dots {
   display: flex;
+  justify-content: center;
   gap: 3px;
+  width: 100%;
   height: 6px;
 }
 
@@ -99,24 +337,34 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--tint);
+  background: rgba(255, 255, 255, 0.74);
 }
 
 .calendar-dot.done {
-  background: var(--label-tertiary);
+  background: rgba(255, 255, 255, 0.28);
 }
 
-/* يوم فيه كتابة حرة فقط (بلا مهام) */
 .calendar-dot.writing {
-  background: var(--label-tertiary);
-  opacity: 0.6;
+  background: rgba(255, 255, 255, 0.28);
 }
 
-.empty-state.compact {
-  padding: var(--space-4);
+.calendar-dot.countdown {
+  width: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fff, rgba(255, 255, 255, 0.38));
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
 }
 
-/* زر فتح صفحة اليوم من التقويم */
+.calendar-section-title {
+  align-items: flex-end;
+  padding-block: var(--space-5) var(--space-2);
+}
+
+.calendar-section-title h2 {
+  font-size: 21px;
+  font-weight: 850;
+}
+
 .open-day-btn {
   display: flex;
   align-items: center;
@@ -124,19 +372,95 @@
   font-size: 15px;
 }
 
-/* صف مهمة من صفحة اليوم المحدد */
+.selected-day-card {
+  border-radius: 26px;
+  overflow: hidden;
+}
+
+.selected-day-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.selected-ring {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle, #111 56%, transparent 57%),
+    conic-gradient(#fff var(--progress), rgba(255, 255, 255, 0.12) 0);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.selected-day-summary h3 {
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.selected-day-summary p {
+  margin-top: 3px;
+  color: var(--label-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.selected-countdowns {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding: 0 var(--space-4) var(--space-3);
+  scrollbar-width: none;
+}
+
+.selected-countdowns::-webkit-scrollbar {
+  display: none;
+}
+
+.selected-countdowns span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  max-width: 210px;
+  min-height: 32px;
+  padding-inline: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--label-secondary);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-task-preview {
+  border-top: 0.5px solid var(--separator);
+}
+
 .cal-task-row {
   display: flex;
   align-items: center;
-  background: var(--surface);
-  padding-inline-start: var(--space-3);
+  background: transparent;
+  padding-inline-start: var(--space-4);
+}
+
+.selected-task-preview .cal-task-row + .cal-task-row {
+  border-top: 0.5px solid var(--separator);
 }
 
 .cal-task-circle {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 1.8px solid rgba(148, 163, 184, 0.6);
+  border: 1.8px solid rgba(255, 255, 255, 0.42);
   background: transparent;
   color: transparent;
   display: grid;
@@ -150,21 +474,25 @@
 }
 
 .cal-task-row.done .cal-task-circle {
-  background: var(--tint);
-  color: var(--on-tint);
+  background: #fff;
+  color: #000;
 }
 
 .cal-task-text {
   flex: 1;
-  text-align: start;
-  font-size: 17px;
-  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  min-width: 0;
   min-height: 48px;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  text-align: start;
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: opacity var(--dur-fast);
 }
 
 .cal-task-text:active {
-  opacity: 0.6;
+  opacity: 0.62;
 }
 
 .cal-task-row.done .cal-task-text {
@@ -172,7 +500,23 @@
   text-decoration: line-through;
 }
 
-/* ---------- العدادات ---------- */
+.selected-more,
+.selected-empty-action {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--label-secondary);
+  border-top: 0.5px solid var(--separator);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.selected-empty-action {
+  border-top: 0.5px solid var(--separator);
+}
 
 .countdown-grid {
   display: grid;
@@ -180,24 +524,30 @@
   gap: var(--space-3);
 }
 
-@media (min-width: 480px) {
-  .countdown-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
 .countdown-card {
-  background: var(--surface);
-  border-radius: var(--radius-m);
-  padding: var(--space-3) var(--space-4) var(--space-4);
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  gap: var(--space-2);
+}
+
+.countdown-card.future::before,
+.countdown-card.now::before {
+  content: "";
+  position: absolute;
+  inset: -70px auto auto -55px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  filter: blur(4px);
 }
 
 .countdown-top {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -205,11 +555,20 @@
 }
 
 .countdown-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.countdown-title svg {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .countdown-delete {
@@ -220,35 +579,37 @@
 }
 
 .countdown-value {
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
 }
 
 .countdown-num {
-  font-size: 40px;
-  font-weight: 800;
-  line-height: 1.1;
+  font-size: 44px;
+  font-weight: 900;
+  line-height: 1;
   color: var(--tint);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -1px;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5); /* توهج رقم العداد */
+  letter-spacing: -1.5px;
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.32);
 }
 
 .countdown-label {
-  font-size: 15px;
+  font-size: 14px;
   color: var(--label-secondary);
+  font-weight: 700;
 }
 
 .countdown-now {
-  font-size: 26px;
-  font-weight: 800;
+  font-size: 25px;
+  font-weight: 850;
   color: var(--success);
 }
 
 .countdown-past {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--label-tertiary);
 }
 
@@ -257,59 +618,163 @@
   color: var(--label-tertiary);
 }
 
+.calendar-empty-countdowns {
+  min-height: 160px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+@media (min-width: 520px) {
+  .countdown-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 @media (max-width: 420px) {
-  .calendar-card {
-    padding-inline: var(--space-3);
+  .countdown-spotlight {
+    min-height: 198px;
+    padding: 20px;
+    border-radius: 28px;
+  }
+
+  .spotlight-content {
+    max-width: 66%;
+  }
+
+  .countdown-spotlight h2 {
+    font-size: 22px;
+  }
+
+  .spotlight-number strong {
+    font-size: 70px;
+  }
+
+  .spotlight-number {
+    inset-inline-end: 20px;
+  }
+
+  .calendar-insights {
+    gap: 6px;
+  }
+
+  .calendar-insight-pill {
+    padding: 9px 8px;
+  }
+
+  .calendar-insight-pill span {
+    font-size: 11px;
+  }
+
+  .calendar-insight-pill strong {
+    font-size: 18px;
+  }
+
+  .calendar-grid {
+    gap: 3px;
+  }
+
+  .calendar-day {
+    min-height: 49px;
+    border-radius: 16px;
+  }
+
+  .calendar-day-num {
+    width: 29px;
+    height: 29px;
+    font-size: 14px;
+  }
+
+  .selected-day-summary {
+    padding: var(--space-3);
+  }
+
+  .selected-ring {
+    width: 56px;
+    height: 56px;
+  }
+
+  .cal-task-text {
+    font-size: 15px;
+  }
+}
+
+.device-preview-app .calendar-screen {
+  padding-block-start: calc(var(--safe-top) + 12px);
+  padding-block-end: calc(var(--tabbar-height) + var(--safe-bottom) + 112px);
+}
+
+.device-preview-app .calendar-screen .screen-header {
+  padding-block: 0 var(--space-3);
+}
+
+.device-preview-app .calendar-screen .screen-header h1 {
+  font-size: 28px;
+}
+
+.device-preview-app .calendar-screen .screen-subtitle {
+  font-size: 12px;
+}
+
+.device-preview-app .countdown-spotlight {
+  min-height: 178px;
+  padding: 18px;
+}
+
+.device-preview-app .countdown-spotlight h2 {
+  font-size: 22px;
+}
+
+.device-preview-app .spotlight-number {
+  inset-inline-end: 18px;
+  inset-block-end: 28px;
+}
+
+.device-preview-app .spotlight-number strong {
+  font-size: 66px;
+}
+
+.device-preview-app .calendar-insights {
+  margin-block: var(--space-2);
+}
+
+.device-preview-app .calendar-card {
+  border-radius: 24px;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  margin-block-end: calc(var(--tabbar-height) + 128px);
+}
+
+.device-preview-app .calendar-grid {
+  gap: 2px;
+}
+
+.device-preview-app .calendar-day {
+  min-height: 43px;
+  border-radius: 14px;
+  padding-top: 3px;
+}
+
+.device-preview-app .calendar-day-num {
+  width: 27px;
+  height: 27px;
+  font-size: 14px;
+}
+
+.device-preview-app .calendar-section-title {
+  padding-block: var(--space-4) var(--space-2);
+}
+
+@media (max-width: 380px) {
+  .calendar-weekday {
+    font-size: 11px;
+  }
+
+  .calendar-day {
+    min-height: 46px;
+    padding-top: 4px;
   }
 
   .calendar-title h2 {
     font-size: 17px;
-  }
-
-  .calendar-day {
-    min-height: 44px;
-  }
-
-  .calendar-day-num {
-    width: 28px;
-    height: 28px;
-    font-size: 14px;
-  }
-
-  .cal-task-text {
-    font-size: 16px;
-    padding-inline: var(--space-3) var(--space-2);
-  }
-
-  .countdown-card {
-    padding: var(--space-3);
-  }
-
-  .countdown-title {
-    font-size: 15px;
-  }
-
-  .countdown-value {
-    flex-wrap: wrap;
-    row-gap: 2px;
-  }
-
-  .countdown-num {
-    font-size: 34px;
-  }
-
-  .countdown-date {
-    line-height: 1.4;
-  }
-}
-
-@media (max-width: 390px) {
-  .calendar-grid {
-    gap: 1px;
-  }
-
-  .calendar-weekday {
-    font-size: 11px;
   }
 
   .open-day-btn {
