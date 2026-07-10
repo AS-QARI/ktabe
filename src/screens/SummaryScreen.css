@@ -7,10 +7,15 @@
   isolation: isolate;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: var(--space-2);
+  gap: 6px;
   height: calc(100dvh - var(--tabbar-height) - var(--safe-bottom));
   overflow: hidden;
-  padding: calc(var(--safe-top) + var(--space-2)) var(--space-4) var(--space-3);
+  padding: calc(var(--safe-top) + 8px) var(--space-4) var(--space-2);
+  --summary-warm: #ff9f0a;
+  --summary-warm-2: #e7ad52;
+  --summary-warm-soft: #ffd39a;
+  --summary-warm-muted: rgba(255, 159, 10, 0.055);
+  --summary-warm-glow: rgba(255, 159, 10, 0.12);
 }
 
 /* إضاءة محيطية هادئة كهوية شاشة التقويم */
@@ -21,8 +26,8 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(circle at 84% 0%, rgba(173, 196, 228, 0.15), transparent 30%),
-    radial-gradient(circle at 10% 92%, rgba(255, 255, 255, 0.06), transparent 30%);
+    radial-gradient(circle at 84% 0%, rgba(255, 255, 255, 0.075), transparent 32%),
+    radial-gradient(circle at 10% 92%, rgba(255, 159, 10, 0.04), transparent 30%);
   opacity: 0.85;
 }
 
@@ -33,12 +38,12 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
-  padding-block: var(--space-1) var(--space-1);
+  gap: 8px;
+  padding-block: 0 2px;
 }
 
 .summary-head h1 {
-  font-size: 26px;
+  font-size: 25px;
   font-weight: 800;
   letter-spacing: -0.4px;
   line-height: 1.15;
@@ -46,7 +51,7 @@
 
 .summary-date {
   margin-top: 1px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--label-secondary);
 }
@@ -60,8 +65,8 @@
 
 .sum-body {
   display: grid;
-  grid-template-rows: minmax(0, 1.06fr) minmax(0, 0.6fr) minmax(0, 1.1fr);
-  gap: 10px;
+  grid-template-rows: minmax(136px, 0.86fr) minmax(98px, 0.5fr) minmax(168px, 0.94fr);
+  gap: 8px;
   min-height: 0;
 }
 
@@ -74,10 +79,10 @@
   position: relative;
   overflow: hidden;
   min-height: 0;
-  border-radius: var(--radius-l);
+  border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
 }
 
 /* ---------- ١) بطل اليوم ---------- */
@@ -85,23 +90,23 @@
 .sum-hero {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: 10px;
-  padding: 14px 16px 15px;
+  gap: 8px;
+  padding: 11px 14px 12px;
   background:
-    radial-gradient(circle at 88% -12%, rgba(173, 196, 228, 0.16), transparent 44%),
+    radial-gradient(circle at 88% -12%, rgba(255, 159, 10, 0.045), transparent 44%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
 }
 
 .sum-hero-top {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 11px;
   min-height: 0;
 }
 
 .ring-wrap {
   position: relative;
-  width: 112px;
+  width: 92px;
   aspect-ratio: 1;
   flex-shrink: 0;
   display: grid;
@@ -123,20 +128,21 @@
 
 /* مسار الحلقة درجة أفتح من لون التعبئة نفسه — لا رمادي محايد */
 .ring-track {
-  stroke: rgba(173, 196, 228, 0.16);
+  stroke: rgba(255, 255, 255, 0.14);
 }
 
 .ring-fill {
-  stroke: #adc4e4;
-  filter: drop-shadow(0 0 10px rgba(173, 196, 228, 0.18));
+  stroke: #f5f5f5;
+  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.14));
   transition: stroke-dashoffset 800ms var(--ease-out);
 }
 
 .ring-value {
-  font-size: 26px;
+  font-size: 23px;
   font-weight: 800;
   letter-spacing: -0.4px;
-  color: #f0f5fb;
+  color: #fff;
+  text-shadow: 0 0 16px rgba(255, 255, 255, 0.16);
 }
 
 .sum-hero-copy {
@@ -144,24 +150,25 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 }
 
 .sum-eyebrow {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  min-height: 22px;
-  padding: 0 9px;
+  min-height: 19px;
+  padding: 0 8px;
   border-radius: 999px;
-  background: rgba(173, 196, 228, 0.13);
-  color: #c3d3e8;
-  font-size: 11.5px;
+  background: var(--summary-warm-muted);
+  color: #f2f2f2;
+  box-shadow: inset 0 0 0 1px rgba(255, 159, 10, 0.16);
+  font-size: 10.5px;
   font-weight: 700;
 }
 
 .sum-hero-copy h2 {
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 800;
   letter-spacing: -0.35px;
   line-height: 1.18;
@@ -169,9 +176,9 @@
 }
 
 .sum-hero-copy p {
-  font-size: 13px;
-  line-height: 1.5;
-  color: #b6c1d1;
+  font-size: 12px;
+  line-height: 1.38;
+  color: rgba(255, 255, 255, 0.62);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -183,30 +190,30 @@
 .sum-meter-block {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .sum-meter {
   display: flex;
   gap: 3px;
-  height: 7px;
+  height: 5px;
 }
 
 .sum-meter-seg {
   flex: 1;
   border-radius: 999px;
-  background: rgba(173, 196, 228, 0.16);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .sum-meter-seg.done {
-  background: #adc4e4;
-  box-shadow: 0 0 8px rgba(173, 196, 228, 0.22);
+  background: linear-gradient(90deg, #fff, rgba(255, 159, 10, 0.7));
+  box-shadow: 0 0 10px var(--summary-warm-glow);
 }
 
 .sum-meter-solid {
   display: block;
   border-radius: 999px;
-  background: rgba(173, 196, 228, 0.16);
+  background: rgba(255, 255, 255, 0.12);
   overflow: hidden;
 }
 
@@ -214,8 +221,8 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #adc4e4;
-  box-shadow: 0 0 8px rgba(173, 196, 228, 0.22);
+  background: linear-gradient(90deg, #fff, rgba(255, 159, 10, 0.7));
+  box-shadow: 0 0 10px var(--summary-warm-glow);
 }
 
 .sum-meter-row {
@@ -223,7 +230,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  font-size: 12.5px;
+  font-size: 11.5px;
 }
 
 .sum-meter-main {
@@ -233,13 +240,13 @@
 
 .sum-meter-side {
   font-weight: 700;
-  color: #9fb0c6;
+  color: rgba(255, 255, 255, 0.56);
 }
 
 .sum-meter-hint {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  color: #9fb0c6;
+  color: rgba(255, 255, 255, 0.56);
 }
 
 /* ---------- ٢) صف المؤشرات ---------- */
@@ -247,7 +254,7 @@
 .sum-tiles {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
 }
 
@@ -255,45 +262,46 @@
   display: grid;
   grid-template-rows: auto auto auto;
   align-content: space-between;
-  gap: 4px;
-  padding: 11px 14px 12px;
+  gap: 3px;
+  padding: 9px 12px 10px;
 }
 
 .stat-tile-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
 }
 
 .stat-icon {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   border-radius: 9px;
-  color: #adc4e4;
-  background: rgba(173, 196, 228, 0.13);
+  color: #f4f4f4;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* سلسلة مشتعلة — حالة حقيقية وليست زخرفة */
 .stat-icon.warm {
-  color: #ffb03a;
-  background: rgba(255, 159, 26, 0.14);
+  color: #fff;
+  background: rgba(255, 159, 10, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 159, 10, 0.16);
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
-  color: #93a3ba;
+  color: rgba(255, 255, 255, 0.55);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .stat-value {
-  font-size: 27px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.4px;
   line-height: 1;
@@ -302,16 +310,16 @@
 
 .stat-unit {
   margin-inline-start: 5px;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0;
-  color: #9fb0c6;
+  color: rgba(255, 255, 255, 0.56);
 }
 
 .stat-sub {
-  font-size: 11.5px;
+  font-size: 10.8px;
   font-weight: 600;
-  color: #7e8ea3;
+  color: rgba(255, 255, 255, 0.42);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -322,10 +330,10 @@
 .sum-week {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 8px;
-  padding: 13px 16px 12px;
+  gap: 6px;
+  padding: 10px 14px 10px;
   background:
-    radial-gradient(circle at 8% 110%, rgba(255, 255, 255, 0.05), transparent 34%),
+    radial-gradient(circle at 8% 110%, rgba(255, 159, 10, 0.035), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018));
 }
 
@@ -333,23 +341,23 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .sum-week-head h2 {
-  font-size: 14.5px;
+  font-size: 13.5px;
   font-weight: 700;
-  color: #a9b8cc;
+  color: rgba(255, 255, 255, 0.66);
 }
 
 .sum-week-total {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
-  color: #8fa0b7;
+  color: rgba(255, 255, 255, 0.48);
 }
 
 .sum-week-total b {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: #f8fafc;
@@ -361,7 +369,7 @@
   position: relative;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
+  gap: 5px;
   min-height: 0;
 }
 
@@ -369,7 +377,7 @@
   content: "";
   position: absolute;
   inset-inline: 0;
-  bottom: 20px; /* ارتفاع التسمية ١٤ + فجوة ٦ */
+  bottom: 18px; /* ارتفاع التسمية ١٣ + فجوة ٥ */
   height: 1px;
   background: rgba(255, 255, 255, 0.09);
 }
@@ -377,7 +385,7 @@
 .wk-col {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: 6px;
+  gap: 5px;
   min-height: 0;
 }
 
@@ -391,106 +399,107 @@
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: min(58%, 18px);
+  width: min(54%, 16px);
   height: var(--h, 0%);
   border-radius: 5px 5px 0 0; /* قمة مدوّرة، قاعدة مستقيمة */
-  background: rgba(148, 163, 184, 0.42);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .wk-bar.is-today {
-  background: linear-gradient(180deg, #d7e4f7, #a9c3e8);
-  box-shadow: 0 0 12px rgba(173, 196, 228, 0.2);
+  background: linear-gradient(180deg, #fff, rgba(255, 159, 10, 0.52));
+  box-shadow: 0 0 14px var(--summary-warm-glow);
 }
 
 .wk-bar.is-zero {
   height: 4px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.09);
 }
 
 /* قيمة القمة — فوق أعلى يوم واليوم الحالي فقط، لا على كل عمود */
 .wk-cap {
   position: absolute;
-  bottom: calc(var(--h, 0%) + 4px);
+  bottom: calc(var(--h, 0%) + 3px);
   left: 50%;
   transform: translateX(-50%);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 800;
-  color: #aebfd6;
+  color: #f5f5f5;
 }
 
 .wk-day {
-  height: 14px;
-  line-height: 14px;
+  height: 13px;
+  line-height: 13px;
   text-align: center;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
-  color: #7c8ba1;
+  color: rgba(255, 255, 255, 0.38);
 }
 
 .wk-day.is-today {
-  color: #e2ecf9;
+  color: #fff;
 }
 
 .sum-week-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 11px;
   font-weight: 600;
-  color: #8fa0b7;
+  color: rgba(255, 255, 255, 0.48);
 }
 
 .sum-week-foot b {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
-  color: #eef3fa;
+  color: #fff;
 }
 
 /* ---------- تكيّف الارتفاعات القصيرة والشاشات الضيقة ---------- */
 
 @media (max-height: 760px) {
   .summary-screen {
-    gap: var(--space-1);
+    gap: 5px;
   }
 
   .sum-body {
-    gap: 8px;
+    grid-template-rows: minmax(126px, 0.82fr) minmax(90px, 0.46fr) minmax(150px, 0.86fr);
+    gap: 7px;
   }
 
   .ring-wrap {
-    width: 100px;
+    width: 84px;
   }
 
   .ring-value {
-    font-size: 23px;
+    font-size: 21px;
   }
 
   .sum-hero {
-    padding: 12px 14px 13px;
+    padding: 10px 12px 11px;
   }
 
   .sum-hero-copy h2 {
-    font-size: 19px;
+    font-size: 18px;
   }
 
   .stat-value {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   .sum-week {
-    padding: 11px 14px 10px;
+    padding: 9px 12px;
   }
 }
 
 @media (max-height: 672px) {
   .ring-wrap {
-    width: 86px;
+    width: 76px;
   }
 
   .ring-value {
-    font-size: 20px;
+    font-size: 19px;
   }
 
   .sum-hero-top {
@@ -502,7 +511,7 @@
   }
 
   .sum-hero-copy h2 {
-    font-size: 17.5px;
+    font-size: 17px;
   }
 
   .sum-eyebrow {
@@ -510,7 +519,7 @@
   }
 
   .stat-value {
-    font-size: 21px;
+    font-size: 20px;
   }
 
   .stat-sub {
@@ -518,7 +527,7 @@
   }
 
   .summary-head h1 {
-    font-size: 23px;
+    font-size: 22px;
   }
 }
 
@@ -533,7 +542,7 @@
   }
 
   .ring-wrap {
-    width: 96px;
+    width: 80px;
   }
 
   .stat-tile {
@@ -544,4 +553,11 @@
   .sum-week {
     padding-inline: 13px;
   }
+}
+
+/* داخل إطار المعاينة: لا نسمح للملخص أن يمتد تحت شريط التنقل */
+.device-preview-app .summary-screen {
+  height: calc(100% - var(--tabbar-height) - var(--safe-bottom) - 34px);
+  max-height: calc(100% - var(--tabbar-height) - var(--safe-bottom) - 34px);
+  padding-block-start: calc(var(--safe-top) + 8px);
 }

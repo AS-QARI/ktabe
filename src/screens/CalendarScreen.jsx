@@ -108,6 +108,33 @@ function taskCountLabel(count) {
 }
 
 /**
+ * توزيع ذكي لصفوف المعاينة على الأقسام الثلاثة:
+ * القسم الفارغ ينكمش لشريط رفيع ولا يستهلك صفوفاً، ومساحته تذهب
+ * للأقسام النشطة بالأولوية: اليوم ثم المتأخرة ثم القادمة.
+ * ثلاثة أقسام نشطة → ٢+٢+٢ (كما هو متفق)، قسمان → حتى ٤ للأهم،
+ * قسم واحد → حتى ٥ صفوف.
+ */
+function allocatePreviews(counts) {
+  const order = ['today', 'late', 'next'];
+  const activeCount = order.filter((k) => counts[k] > 0).length;
+  const cap = activeCount <= 1 ? 5 : activeCount === 2 ? 4 : 2;
+  let pool = activeCount <= 1 ? 5 : 6;
+  const alloc = { today: 0, late: 0, next: 0 };
+  for (const k of order) {
+    alloc[k] = Math.min(2, counts[k], pool);
+    pool -= alloc[k];
+  }
+  for (const k of order) {
+    const extra = Math.min(cap - alloc[k], counts[k] - alloc[k], pool);
+    if (extra > 0) {
+      alloc[k] += extra;
+      pool -= extra;
+    }
+  }
+  return alloc;
+}
+
+/**
  * شاشة التقويم — مركز المهام في شاشة واحدة ثابتة بلا تمرير:
  * متأخرة (تُنقل لليوم بضغطة) / اليوم / قادمة، وشبكة الشهر
  * والعدادات التنازلية خلف ضغطة في أوراق منزلقة.
@@ -206,6 +233,29 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
   const upcomingTasks = upcomingGroups.flatMap((group) =>
     group.items.map((task) => ({ ...task, date: group.date }))
   );
+
+  /* توزيع صفوف المعاينة حسب الأقسام غير الفارغة */
+  const previewAlloc = useMemo(
+    () =>
+      allocatePreviews({
+        late: overdue.length,
+        today: todayTasks.length,
+        next: upcomingCount,
+      }),
+    [overdue.length, todayTasks.length, upcomingCount]
+  );
+  const allTasksEmpty =
+    overdue.length === 0 && todayTasks.length === 0 && upcomingCount === 0;
+  // القسم الفارغ صف مضغوط (auto)، والنشط يأخذ حصة تتناسب مع صفوفه
+  const snapshotRows = allTasksEmpty
+    ? '1fr'
+    : [overdue.length, todayTasks.length, upcomingCount]
+        .map((count, i) => {
+          if (count === 0) return 'auto';
+          const shown = [previewAlloc.late, previewAlloc.today, previewAlloc.next][i];
+          return `minmax(0, ${shown + 1}fr)`;
+        })
+        .join(' ');
   const sheetTasks =
     taskSheet?.type === 'overdue'
       ? overdue
@@ -434,13 +484,28 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
               )}
             </button>
 
-            <div className="task-snapshot" aria-label="ملخص المهام">
+            <div
+              className="task-snapshot"
+              aria-label="ملخص المهام"
+              style={{ gridTemplateRows: snapshotRows }}
+            >
+              {allTasksEmpty ? (
+                <div className="task-snapshot-empty">
+                  <CheckIcon size={30} />
+                  <strong>لا مهام مفتوحة</strong>
+                  <p>كل شيء منجز — أضف مهمة جديدة لبدء يومك.</p>
+                  <button type="button" onClick={() => setComposerOpen(true)}>
+                    مهمة جديدة
+                  </button>
+                </div>
+              ) : (
+                <>
               <TaskPreviewSection
                 tone="late"
                 title="متأخرة"
                 count={overdue.length}
-                tasks={overdue.slice(0, 2)}
-                empty="لا توجد مهام متأخرة"
+                tasks={overdue.slice(0, previewAlloc.late)}
+                empty="لا شيء متأخر"
                 onMore={() => setTaskSheet({ type: 'overdue', title: 'المهام المتأخرة' })}
               >
                 {(task) => (
@@ -468,9 +533,10 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                 tone="today"
                 title="مهام اليوم"
                 count={todayTasks.length}
-                tasks={todayTasks.slice(0, 2)}
+                tasks={todayTasks.slice(0, previewAlloc.today)}
                 empty="لا مهام مفتوحة اليوم"
                 onMore={() => setTaskSheet({ type: 'today', title: 'مهام اليوم' })}
+                onAdd={() => setComposerOpen(true)}
               >
                 {(task) => (
                   <TaskPreviewRow
@@ -487,7 +553,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                 tone="next"
                 title="قادمة"
                 count={upcomingCount}
-                tasks={upcomingTasks.slice(0, 2)}
+                tasks={upcomingTasks.slice(0, previewAlloc.next)}
                 empty="لا مهام قادمة"
                 onMore={() => setTaskSheet({ type: 'upcoming', title: 'المهام القادمة' })}
               >
@@ -502,6 +568,8 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                   />
                 )}
               </TaskPreviewSection>
+                </>
+              )}
             </div>
           </>
         )}
@@ -702,8 +770,21 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
   );
 }
 
-function TaskPreviewSection({ tone, title, count, tasks, empty, onMore, children }) {
+function TaskPreviewSection({ tone, title, count, tasks, empty, onMore, onAdd, children }) {
   const hasMore = count > tasks.length;
+
+  // قسم فارغ: شريط رفيع بدل بطاقة كاملة — المساحة تذهب للأقسام النشطة
+  if (count === 0) {
+    return (
+      <section className={`task-preview task-preview-${tone} is-collapsed`}>
+        <h2>{title}</h2>
+        <span className="task-preview-clear">
+          <CheckIcon size={13} />
+          {empty}
+        </span>
+      </section>
+    );
+  }
 
   return (
     <section className={`task-preview task-preview-${tone}`}>
@@ -720,10 +801,13 @@ function TaskPreviewSection({ tone, title, count, tasks, empty, onMore, children
       </div>
 
       <div className="task-preview-list">
-        {count === 0 ? (
-          <div className="task-preview-empty">{empty}</div>
-        ) : (
-          tasks.map((task) => children(task))
+        {tasks.map((task) => children(task))}
+        {/* إضافة سريعة تملأ المساحة المتبقية عندما تقلّ المهام المعروضة */}
+        {onAdd && !hasMore && tasks.length < 4 && (
+          <button type="button" className="task-preview-add" onClick={onAdd}>
+            <PlusIcon size={15} />
+            مهمة جديدة
+          </button>
         )}
       </div>
     </section>

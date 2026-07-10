@@ -444,6 +444,35 @@
   display: none;
 }
 
+.notes-scope-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.notes-scope-switch button {
+  min-height: 36px;
+  border-radius: 999px;
+  color: var(--label-secondary);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.notes-scope-switch button.active {
+  background: #fff;
+  color: #000;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.18);
+}
+
 .note-card,
 .empty-note-card {
   width: 100%;
@@ -518,6 +547,7 @@
 /* ---------- مساحة الأسطر — مستند متصل مثل ملاحظات آبل ---------- */
 
 .paper-lines {
+  position: relative; /* مرجع مؤشر الإدراج أثناء السحب */
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -527,6 +557,19 @@
   scroll-padding-bottom: calc(var(--keyboard-inset, 0px) + 120px);
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+
+/* أثناء سحب مهمة: لا تحديد نص ولا تفاعل مع أسطر الكتابة */
+.paper-lines.is-dragging {
+  cursor: grabbing;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.paper-lines.is-dragging .line-input {
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .paper-lines::-webkit-scrollbar {
@@ -566,30 +609,104 @@
 /* المهام: السحب الأفقي يزيح، والعمودي يمرر الصفحة */
 .paper-line.is-task { touch-action: pan-y; }
 
-/* مؤشر الإدراج أثناء سحب مهمة — خط برتقالي مثل آبل */
-.paper-line.drop-target::before,
-.paper-tail.drop-target::before {
-  content: '';
+/* مؤشر الإدراج أثناء سحب مهمة — خط برتقالي بمستوى الفتحة نفسها:
+   عند حافة الورقة للجذور، ومُزاح للداخل للمهام الفرعية */
+.drop-line {
   position: absolute;
-  inset-inline: 16px;
-  top: -1px;
-  height: 2.5px;
+  inset-inline-end: 14px;
+  height: 3px;
+  margin-top: -1.5px;
   border-radius: 999px;
   background: var(--checklist-accent);
   box-shadow: 0 0 12px rgba(255, 159, 10, 0.55);
   pointer-events: none;
-  z-index: 5;
+  z-index: 6;
+  transition: top 90ms var(--ease-out), inset-inline-start 90ms var(--ease-out);
 }
 
-/* المهمة الملتقطة: ترتفع وتشف — مثل رفع العنصر في ملاحظات آبل */
+.drop-line::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -2px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: var(--checklist-accent);
+  box-shadow: 0 0 8px rgba(255, 159, 10, 0.5);
+}
+
+/* المهمة الملتقطة: تخفت في مكانها والشبح يمثلها تحت الإصبع */
 .paper-line.dragging {
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 .paper-line.dragging .line-circle {
   transform: scale(1.15);
   border-color: var(--checklist-accent);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+/* بطاقة الشبح — تتبع الإصبع فوق كل شيء، بلا تفاعل */
+.drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 400;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.drag-ghost-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(38, 38, 44, 0.94);
+  border: 1px solid rgba(255, 159, 10, 0.35);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.55),
+    0 2px 10px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  transform-origin: 85% center;
+  animation: ghost-lift 170ms var(--ease-spring);
+}
+
+@keyframes ghost-lift {
+  from {
+    transform: scale(0.88);
+    opacity: 0.4;
+  }
+}
+
+.drag-ghost-circle {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.7px solid rgba(255, 159, 10, 0.8);
+  color: transparent;
+  display: grid;
+  place-items: center;
+}
+
+.drag-ghost-circle.done {
+  background: var(--checklist-accent);
+  border-color: var(--checklist-accent);
+  color: #fff;
+}
+
+.drag-ghost-text {
+  min-width: 0;
+  color: var(--label);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* الهامش: تسكن فيه دائرة المهمة فقط */
@@ -636,6 +753,7 @@
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none; /* لا قائمة iOS عند الضغط المطول للالتقاط */
   transition: background var(--dur-fast), border-color var(--dur-fast),
     transform var(--dur-med) var(--ease-spring);
 }
@@ -659,7 +777,18 @@
   100% { transform: scale(1); }
 }
 
-/* هدف التعشيش (إفلات على منتصف مهمة): توهج حول دائرتها */
+/* هدف التعشيش (إفلات على منتصف مهمة): كبسولة متقطعة حول السطر كله
+   وتوهج حول دائرته — «أفلت هنا لتصبح فرعية» */
+.paper-line.subtask-drop-target::after {
+  content: '';
+  position: absolute;
+  inset: 1px 4px;
+  border-radius: 12px;
+  border: 1.6px dashed rgba(255, 159, 10, 0.6);
+  background: rgba(255, 159, 10, 0.08);
+  pointer-events: none;
+}
+
 .paper-line.subtask-drop-target .line-circle {
   border-color: var(--checklist-accent);
   box-shadow:

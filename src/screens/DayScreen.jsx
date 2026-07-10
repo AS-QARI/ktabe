@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getDayPages,
+  listAllPages,
   createPage,
   updatePage,
   createBlock,
@@ -47,6 +48,10 @@ const shortWeekdayFmt = new Intl.DateTimeFormat('ar-u-ca-gregory-nu-latn', {
 });
 const dayNumberFmt = new Intl.DateTimeFormat('ar-u-ca-gregory-nu-latn', {
   day: 'numeric',
+});
+const noteTimeFmt = new Intl.DateTimeFormat('ar-u-ca-gregory-nu-latn', {
+  day: 'numeric',
+  month: 'short',
 });
 
 /* أنماط النص — تقابل قائمة الأنماط في لوحة تنسيق ملاحظات آبل */
@@ -126,6 +131,11 @@ function contentText(content) {
 
 function isEmptyContent(content) {
   return !content || content.replace(/<[^>]*>/g, '').replace(/&nbsp;|\u200b/g, '').trim() === '';
+}
+
+function noteUpdatedAt(page) {
+  const values = [page.updated_at, page.created_at, ...(page.blocks ?? []).map((b) => b.updated_at)];
+  return Math.max(...values.filter(Boolean).map((value) => new Date(value).getTime()));
 }
 
 function placeCaretAtEnd(el) {
@@ -249,6 +259,7 @@ function isBold(content) {
  */
 export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [pages, setPages] = useState(null); // null = يحمّل
+  const [allPages, setAllPages] = useState([]);
   const [error, setError] = useState(null);
   const [focusedId, setFocusedId] = useState(null);
   const [pendingFocus, setPendingFocus] = useState(null);
@@ -256,9 +267,11 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [flip, setFlip] = useState('next');
   const [localPageMeta, setLocalPageMeta] = useState(() => readLocalPageMeta(dateKey));
   const [activePageId, setActivePageId] = useState(null);
+  const [pendingOpenPageId, setPendingOpenPageId] = useState(null);
+  const [notesScope, setNotesScope] = useState('day');
   const [draggingId, setDraggingId] = useState(null);
-  const [dropTargetId, setDropTargetId] = useState(null);
-  const [dropEdge, setDropEdge] = useState(null); // معرف جذر يُدرج قبله، أو 'end'
+  const [dragGhost, setDragGhost] = useState(null); // بطاقة الشبح التي تتبع الإصبع
+  const [dropSlot, setDropSlot] = useState(null); // فتحة الإفلات: خط إدراج أو تعشيش
   const [formatMenuOpen, setFormatMenuOpen] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const [selectMode, setSelectMode] = useState(false);
@@ -270,6 +283,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const inputRefs = useRef(new Map());
   const dateInputRef = useRef(null);
   const paperLinesRef = useRef(null);
+  const dropSlotRef = useRef(null); // مرآة dropSlot للقراءة وقت الإفلات
+  const dragCtx = useRef(null); // سياق السحب الجاري: لقطة الأسطر والتمرير
+  const ghostRef = useRef(null);
 
   const markEdit = () => {
     lastEditRef.current = Date.now();
@@ -277,7 +293,12 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
   const load = useCallback(async () => {
     try {
-      setPages(await getDayPages(dateKey));
+      const [dayPages, everyPage] = await Promise.all([
+        getDayPages(dateKey),
+        listAllPages(),
+      ]);
+      setPages(dayPages);
+      setAllPages(everyPage);
       setError(null);
     } catch (e) {
       setError(e.message);
@@ -339,6 +360,10 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     () => [...(pages ?? [])].sort((a, b) => a.page_no - b.page_no),
     [pages]
   );
+  const sortedAllPages = useMemo(
+    () => [...allPages].sort((a, b) => noteUpdatedAt(b) - noteUpdatedAt(a)),
+    [allPages]
+  );
   const page = sortedPages.find((p) => p.id === activePageId) ?? null;
   const blocks = useMemo(() => page?.blocks ?? [], [page]);
   const pageMeta = {
@@ -396,6 +421,34 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       }),
     [sortedPages]
   );
+  const allNoteCards = useMemo(
+    () =>
+      sortedAllPages.map((p) => {
+        const pageBlocks = [...(p.blocks ?? [])].sort((a, b) => a.position - b.position);
+        const firstText = pageBlocks.map((b) => contentText(b.content)).find(Boolean);
+        const taskCount = pageBlocks.filter((b) => b.kind === 'task').length;
+        const doneCount = pageBlocks.filter((b) => b.kind === 'task' && b.is_completed).length;
+        return {
+          page: p,
+          title: p.title?.trim() || `ملاحظة ${p.page_no}`,
+          preview: firstText || 'اضغط وافتح مساحة كتابة هذه الملاحظة.',
+          lineCount: pageBlocks.length,
+          taskCount,
+          doneCount,
+          dateLabel: noteTimeFmt.format(parseDateKey(p.page_date)),
+        };
+      }),
+    [sortedAllPages]
+  );
+  const visibleNoteCards = notesScope === 'all' ? allNoteCards : noteCards;
+
+  useEffect(() => {
+    if (!pendingOpenPageId || pages === null) return;
+    if (pages.some((p) => p.id === pendingOpenPageId)) {
+      setActivePageId(pendingOpenPageId);
+      setPendingOpenPageId(null);
+    }
+  }, [pages, pendingOpenPageId]);
   const dayRail = useMemo(
     () =>
       DAY_RAIL_OFFSETS.map((offset) => {
@@ -429,12 +482,22 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       ps.map((p) => (p.id === page.id ? { ...p, blocks: fn(p.blocks) } : p))
     );
 
+  const touchPageInAllPages = (pageId, updater) => {
+    const updatedAt = new Date().toISOString();
+    setAllPages((ps) =>
+      ps.map((p) =>
+        p.id === pageId ? { ...updater(p), updated_at: updatedAt } : p
+      )
+    );
+  };
+
   const savePagePatch = async (patch) => {
     markEdit();
     try {
       const p = await ensurePage();
       setLocalPageMeta(writeLocalPageMeta(dateKey, patch));
       setPages((ps) => ps.map((x) => (x.id === p.id ? { ...x, ...patch } : x)));
+      touchPageInAllPages(p.id, (x) => ({ ...x, ...patch }));
       clearTimeout(pageSaveTimer.current);
       pageSaveTimer.current = setTimeout(() => {
         updatePage(p.id, patch).catch(() => {});
@@ -447,6 +510,12 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const editContent = (block, value) => {
     markEdit();
     mutate((bs) => bs.map((b) => (b.id === block.id ? { ...b, content: value } : b)));
+    touchPageInAllPages(block.page_id, (p) => ({
+      ...p,
+      blocks: (p.blocks ?? []).map((b) =>
+        b.id === block.id ? { ...b, content: value, updated_at: new Date().toISOString() } : b
+      ),
+    }));
     clearTimeout(saveTimers.current.get(block.id));
     saveTimers.current.set(
       block.id,
@@ -473,12 +542,25 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       const created = await createPage(dateKey, nextNo);
       const nextPage = { ...created, blocks: [] };
       setPages((ps) => [...(ps ?? []), nextPage].sort((a, b) => a.page_no - b.page_no));
+      setAllPages((ps) => [nextPage, ...ps]);
       setActivePageId(nextPage.id);
       setFocusedId(null);
       setCaretIntent('end');
     } catch {
       load();
     }
+  };
+
+  const openNoteCard = (targetPage) => {
+    setFocusedId(null);
+    setFormatMenuOpen(false);
+    if (targetPage.page_date === dateKey) {
+      setActivePageId(targetPage.id);
+      return;
+    }
+    setPendingOpenPageId(targetPage.id);
+    setFlip(targetPage.page_date < dateKey ? 'prev' : 'next');
+    onDateChange(targetPage.page_date);
   };
 
   /** أول كتابة في يوم فارغ: ننشئ الصفحة (إن لزم) وسطرها الأول */
@@ -495,6 +577,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       setPages((ps) =>
         ps.map((x) => (x.id === p.id ? { ...x, blocks: [...x.blocks, b] } : x))
       );
+      touchPageInAllPages(p.id, (x) => ({ ...x, blocks: [...(x.blocks ?? []), b] }));
       setCaretIntent('end');
       setPendingFocus(b.id);
     } catch {
@@ -529,6 +612,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       setPages((ps) =>
         ps.map((x) => (x.id === p.id ? { ...x, blocks: [...x.blocks, b] } : x))
       );
+      touchPageInAllPages(p.id, (x) => ({ ...x, blocks: [...(x.blocks ?? []), b] }));
       setCaretIntent('end');
       setPendingFocus(b.id);
     } catch {
@@ -555,6 +639,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         position,
       });
       mutate((bs) => [...bs, b]);
+      touchPageInAllPages(page.id, (p) => ({ ...p, blocks: [...(p.blocks ?? []), b] }));
       setCaretIntent('start');
       setPendingFocus(b.id);
     } catch {
@@ -587,6 +672,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         created.push(b);
       }
       mutate((bs) => [...bs, ...created]);
+      touchPageInAllPages(page.id, (p) => ({ ...p, blocks: [...(p.blocks ?? []), ...created] }));
       setCaretIntent('end');
       setPendingFocus(created.at(-1).id);
     } catch {
@@ -642,13 +728,20 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     markEdit();
     navigator.vibrate?.(10);
     const done = !block.is_completed;
+    const completedAt = done ? new Date().toISOString() : null;
     mutate((bs) =>
       bs.map((b) =>
         b.id === block.id
-          ? { ...b, is_completed: done, completed_at: done ? new Date().toISOString() : null }
+          ? { ...b, is_completed: done, completed_at: completedAt }
           : b
       )
     );
+    touchPageInAllPages(block.page_id, (p) => ({
+      ...p,
+      blocks: (p.blocks ?? []).map((b) =>
+        b.id === block.id ? { ...b, is_completed: done, completed_at: completedAt } : b
+      ),
+    }));
     setBlockCompleted(block.id, done).catch(() => load());
   };
 
@@ -656,13 +749,17 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const convertKind = (block) => {
     markEdit();
     navigator.vibrate?.(8);
-    const patch =
-      block.kind === 'text'
-        ? { kind: 'task' }
-        : { kind: 'text', is_completed: false, completed_at: null };
-    mutate((bs) => bs.map((b) => (b.id === block.id ? { ...b, ...patch } : b)));
-    updateBlock(block.id, patch).catch(() => load());
-  };
+	    const patch =
+	      block.kind === 'text'
+	        ? { kind: 'task' }
+	        : { kind: 'text', is_completed: false, completed_at: null };
+	    mutate((bs) => bs.map((b) => (b.id === block.id ? { ...b, ...patch } : b)));
+    touchPageInAllPages(block.page_id, (p) => ({
+      ...p,
+      blocks: (p.blocks ?? []).map((b) => (b.id === block.id ? { ...b, ...patch } : b)),
+    }));
+	    updateBlock(block.id, patch).catch(() => load());
+	  };
 
   /** أقرب مهمة رئيسية فوق هذا السطر الرئيسي — المرشّح ليكون أباً له */
   const prevRootTask = (block) => {
@@ -684,11 +781,12 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     Boolean(prevRootTask(focusedRow.block));
 
   /**
-   * إدخال سطر (مع أبنائه إن وجدوا) تحت مهمة أخرى.
-   * الأبناء ينضمون لنفس الأب الجديد — العمق يبقى مستويين كحد أقصى
-   * لأن بقية الشاشات (الطباعة والملخص) تفترض ذلك.
+   * إدخال سطر (مع أبنائه إن وجدوا) تحت مهمة أخرى عند فهرس محدد.
+   * index هو موضع الإدراج بين الأبناء الحاليين (بدون المسحوب نفسه)،
+   * وnull تعني الإلحاق في النهاية. الأبناء ينضمون لنفس الأب الجديد —
+   * العمق يبقى مستويين كحد أقصى لأن بقية الشاشات تفترض ذلك.
    */
-  const nestUnderParent = (blockId, parentId, afterId = null) => {
+  const nestUnderParent = (blockId, parentId, index = null) => {
     const block = blocks.find((b) => b.id === blockId);
     if (!block || !parentId || parentId === blockId) return;
     const ownChildren = blocks
@@ -697,8 +795,10 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     const siblings = blocks
       .filter((b) => b.parent_id === parentId && b.id !== blockId)
       .sort((a, b) => a.position - b.position);
-    const afterIdx = afterId ? siblings.findIndex((b) => b.id === afterId) : -1;
-    const at = afterIdx >= 0 ? afterIdx + 1 : siblings.length;
+    const at =
+      index == null
+        ? siblings.length
+        : Math.max(0, Math.min(index, siblings.length));
     const ordered = [...siblings.slice(0, at), block, ...ownChildren, ...siblings.slice(at)];
 
     const patches = new Map();
@@ -750,34 +850,10 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     setPendingFocus(block.id);
   };
 
-  /* ================= إعادة ترتيب المهام بالسحب — مثل آبل ================= */
-
-  /**
-   * هل يمكن إفلات المهمة المسحوبة على هذا السطر لجعلها فرعية؟
-   * الإفلات على منتصف مهمة رئيسية: تصبح فرعية تحتها.
-   * الإفلات على مهمة فرعية: تنضم بعدها مباشرة تحت نفس الأب.
-   */
-  const canDropOnTask = (target) => {
-    if (!draggingId || !target || target.kind !== 'task') return false;
-    if (target.id === draggingId || target.parent_id === draggingId) return false;
-    const dragged = blocks.find((b) => b.id === draggingId);
-    if (!dragged || dragged.kind !== 'task') return false;
-    // الإفلات على أبيها الحالي مباشرة لا يغيّر شيئاً
-    if (!target.parent_id && dragged.parent_id === target.id) return false;
-    return true;
-  };
-
-  /** حافة الإدراج المقابلة لسطر: قبل جذره أو بعد شجرته الفرعية */
-  const edgeForRow = (targetId, after) => {
-    const idx = rows.findIndex((r) => r.block.id === targetId);
-    if (idx === -1) return 'end';
-    let rootIdx = idx;
-    while (rootIdx > 0 && rows[rootIdx].depth > 0) rootIdx -= 1;
-    if (!after && rows[idx].depth === 0) return rows[rootIdx].block.id;
-    let j = rootIdx + 1;
-    while (j < rows.length && rows[j].depth > 0) j += 1;
-    return j < rows.length ? rows[j].block.id : 'end';
-  };
+  /* ============ إعادة ترتيب المهام بالسحب — محرك موحّد مثل آبل ============
+     التقاط بالضغط المطول على الدائرة (أو سحب مباشر بالفأرة)، بطاقة شبح
+     تتبع الإصبع، مناطق إفلات هندسية من لقطة ثابتة (لا رفرفة)، مؤشر
+     إدراج بمستوى الإدراج نفسه (جذر/فرعي)، وتمرير تلقائي عند الحواف. */
 
   /** نقل المهمة لمستوى الجذور قبل جذر محدد أو لنهاية المستند */
   const moveTaskToEdge = (blockId, edge) => {
@@ -804,57 +880,214 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     setPendingFocus(blockId);
   };
 
-  const moveTaskToParent = (blockId, targetId) => {
-    const target = blocks.find((b) => b.id === targetId);
-    if (!canDropOnTask(target)) return;
-    const parentId = target.parent_id ?? target.id;
-    nestUnderParent(blockId, parentId, target.parent_id ? target.id : null);
-  };
-
-  const beginCircleDrag = (blockId) => {
-    navigator.vibrate?.(18);
-    setDraggingId(blockId);
-    setDropTargetId(null);
-    setDropEdge(null);
+  const setSlot = (slot) => {
+    dropSlotRef.current = slot;
+    setDropSlot(slot);
   };
 
   /**
-   * أثناء السحب: منتصف المهمة = تعشيش (فرعية)، الحواف = إعادة ترتيب.
-   * نفس منطق ملاحظات آبل: العناصر تفسح مكاناً عند الحافة الأقرب.
+   * لقطة هندسية لأسطر المستند وقت الالتقاط: إحداثيات كل سطر ومستواه
+   * وفهرسه بين إخوته. تُصحَّح لاحقاً بفارق التمرير فقط — بلا إعادة
+   * قياس للـ DOM في كل حركة، فتبقى مناطق الإفلات ثابتة لا ترتجف.
    */
-  const dragOverPoint = (x, y) => {
-    if (!draggingId) return;
-    const el = document.elementFromPoint(x, y);
-    const lineEl = el?.closest?.('.paper-line[data-block-id]');
-    if (!lineEl) {
-      setDropTargetId(null);
-      setDropEdge('end');
-      return;
+  const collectDragRects = (dragId) => {
+    const scroller = paperLinesRef.current;
+    if (!scroller) return null;
+    const byId = new Map(rows.map((r) => [r.block.id, r]));
+    const childIds = new Set(
+      blocks.filter((b) => b.parent_id === dragId).map((b) => b.id)
+    );
+    const perParentCounter = new Map();
+    const rects = [];
+    for (const el of scroller.querySelectorAll('.paper-line[data-block-id]')) {
+      const id = el.dataset.blockId;
+      const row = byId.get(id);
+      if (!row || id === dragId || childIds.has(id)) continue;
+      const rect = el.getBoundingClientRect();
+      const parentId = row.block.parent_id ?? null;
+      const pKey = parentId ?? '__root__';
+      const indexInParent = perParentCounter.get(pKey) ?? 0;
+      perParentCounter.set(pKey, indexInParent + 1);
+      rects.push({
+        id,
+        top: rect.top,
+        height: rect.height,
+        parentId,
+        indexInParent,
+        isTask: row.block.kind === 'task',
+        hasChildren: blocks.some((b) => b.parent_id === id && b.id !== dragId),
+      });
     }
-    const targetId = lineEl.dataset.blockId;
-    const target = blocks.find((b) => b.id === targetId);
-    const rect = lineEl.getBoundingClientRect();
-    const ratio = (y - rect.top) / Math.max(rect.height, 1);
-    if (canDropOnTask(target) && ratio > 0.3 && ratio < 0.7) {
-      setDropTargetId(target.id);
-      setDropEdge(null);
-      return;
-    }
-    setDropTargetId(null);
-    setDropEdge(edgeForRow(targetId, ratio >= 0.5));
+    return {
+      rects,
+      scroller,
+      baseScroll: scroller.scrollTop,
+      contTop: scroller.getBoundingClientRect().top,
+    };
   };
 
-  const finishDrag = () => {
+  /**
+   * فتحة الإفلات من موضع المؤشر — مناطق واضحة لكل سطر:
+   * الثلث الأعلى: إدراج قبله بمستواه، الثلث الأوسط (للمهام الرئيسية):
+   * تعشيش تحته، الثلث الأسفل: إدراج بعده — وأسفلُ جذرٍ له أبناء يعني
+   * «أول الفرعيات» فيمكن الوصول لأي موضع بدقة.
+   */
+  const slotFromPointer = (y) => {
+    const ctx = dragCtx.current;
+    if (!ctx || ctx.rects.length === 0) return null;
+    const scrollDelta = ctx.scroller.scrollTop - ctx.baseScroll;
+    const contentY = (viewY) =>
+      viewY - ctx.contTop + ctx.scroller.scrollTop;
+
+    const gapAtRoot = (beforeRootId, boundaryY) => ({
+      kind: 'gap',
+      parentId: null,
+      beforeRootId,
+      top: contentY(boundaryY),
+      indent: 0,
+      key: `root:${beforeRootId}`,
+    });
+    const gapInParent = (parentId, index, boundaryY) => ({
+      kind: 'gap',
+      parentId,
+      index,
+      top: contentY(boundaryY),
+      indent: 1,
+      key: `sub:${parentId}:${index}`,
+    });
+    const nextRootIdFrom = (from) =>
+      ctx.rects.slice(from).find((q) => q.parentId === null)?.id ?? 'end';
+
+    for (let i = 0; i < ctx.rects.length; i += 1) {
+      const r = ctx.rects[i];
+      const top = r.top - scrollDelta;
+      const bottom = top + r.height;
+      if (y >= bottom) continue;
+
+      const rel = y < top ? 0 : (y - top) / Math.max(r.height, 1);
+      const canNest = r.isTask && r.parentId === null;
+      const beforeBand = canNest ? 0.3 : 0.5;
+      const afterBand = canNest ? 0.7 : 0.5;
+
+      if (rel < beforeBand) {
+        return r.parentId === null
+          ? gapAtRoot(r.id, top)
+          : gapInParent(r.parentId, r.indexInParent, top);
+      }
+      if (canNest && rel < afterBand) {
+        return { kind: 'nest', targetId: r.id, key: `nest:${r.id}` };
+      }
+      if (r.parentId === null) {
+        return r.hasChildren
+          ? gapInParent(r.id, 0, bottom)
+          : gapAtRoot(nextRootIdFrom(i + 1), bottom);
+      }
+      return gapInParent(r.parentId, r.indexInParent + 1, bottom);
+    }
+    const last = ctx.rects.at(-1);
+    return gapAtRoot('end', last.top - scrollDelta + last.height);
+  };
+
+  /** إعادة حساب الفتحة الحالية مع نطاق ميت صغير يمنع الرفرفة بين فتحتين */
+  const refreshSlot = () => {
+    const ctx = dragCtx.current;
+    if (!ctx) return;
+    const slot = slotFromPointer(ctx.lastY);
+    const prev = dropSlotRef.current;
+    if (!slot) {
+      if (prev) setSlot(null);
+      return;
+    }
+    if (prev && prev.key === slot.key) return;
+    if (prev && Math.abs(ctx.lastY - ctx.slotY) < 4) return;
+    ctx.slotY = ctx.lastY;
+    setSlot(slot);
+  };
+
+  /** تحريك الشبح + التمرير التلقائي قرب الحواف + تحديث الفتحة */
+  const moveTaskDrag = (x, y) => {
+    const ctx = dragCtx.current;
+    if (!ctx) return;
+    ctx.lastX = x;
+    ctx.lastY = y;
+    if (ghostRef.current) {
+      ghostRef.current.style.transform = `translate3d(${x - ctx.grabX}px, ${y - ctx.grabY}px, 0)`;
+    }
+
+    const rect = ctx.scroller.getBoundingClientRect();
+    const EDGE = 64;
+    let speed = 0;
+    if (y < rect.top + EDGE) speed = -Math.ceil((rect.top + EDGE - y) / 7);
+    else if (y > rect.bottom - EDGE) speed = Math.ceil((y - (rect.bottom - EDGE)) / 7);
+    ctx.scrollSpeed = speed;
+    if (speed !== 0 && !ctx.scrollRaf) {
+      const step = () => {
+        const c = dragCtx.current;
+        if (!c || !c.scrollSpeed) {
+          if (c) c.scrollRaf = null;
+          return;
+        }
+        const before = c.scroller.scrollTop;
+        c.scroller.scrollTop = before + c.scrollSpeed;
+        if (c.scroller.scrollTop !== before) refreshSlot();
+        c.scrollRaf = requestAnimationFrame(step);
+      };
+      ctx.scrollRaf = requestAnimationFrame(step);
+    }
+    refreshSlot();
+  };
+
+  /** التقاط مهمة: لقطة الأسطر + بطاقة شبح بعرض السطر تتبع الإصبع */
+  const beginTaskDrag = (block, x, y, rowWidth) => {
+    const collected = collectDragRects(block.id);
+    if (!collected) return false;
+    navigator.vibrate?.(16);
+    const width = Math.min(Math.max(rowWidth, 180), 420);
+    dragCtx.current = {
+      id: block.id,
+      ...collected,
+      grabX: width - 18, // الإصبع عند دائرة الشبح (طرفها الأيمن في RTL)
+      grabY: 58, // الشبح فوق الإصبع — فلا يغطي خط الإدراج تحته
+      lastX: x,
+      lastY: y,
+      scrollSpeed: 0,
+      scrollRaf: null,
+      slotY: y,
+    };
+    setDraggingId(block.id);
+    setDragGhost({
+      text: contentText(block.content) || 'مهمة',
+      done: Boolean(block.is_completed),
+      width,
+    });
+    setSlot(slotFromPointer(y));
+    return true;
+  };
+
+  /** إنهاء السحب: تثبيت الفتحة المختارة أو الإلغاء */
+  const endTaskDrag = (commit) => {
+    const ctx = dragCtx.current;
+    if (ctx?.scrollRaf) cancelAnimationFrame(ctx.scrollRaf);
+    const slot = dropSlotRef.current;
+    const id = ctx?.id;
+    dragCtx.current = null;
+    setSlot(null);
     setDraggingId(null);
-    setDropTargetId(null);
-    setDropEdge(null);
+    setDragGhost(null);
+    if (!commit || !slot || !id) return;
+    navigator.vibrate?.(8);
+    if (slot.kind === 'nest') nestUnderParent(id, slot.targetId);
+    else if (slot.parentId) nestUnderParent(id, slot.parentId, slot.index);
+    else moveTaskToEdge(id, slot.beforeRootId);
   };
 
-  const finishDropAction = () => {
-    if (draggingId && dropTargetId) moveTaskToParent(draggingId, dropTargetId);
-    else if (draggingId && dropEdge) moveTaskToEdge(draggingId, dropEdge);
-    finishDrag();
-  };
+  // موضع الشبح الأول — بعد أول رسم له مباشرة
+  useEffect(() => {
+    const ctx = dragCtx.current;
+    if (dragGhost && ghostRef.current && ctx) {
+      ghostRef.current.style.transform = `translate3d(${ctx.lastX - ctx.grabX}px, ${ctx.lastY - ctx.grabY}px, 0)`;
+    }
+  }, [dragGhost]);
 
   /* ================= لوحة المفاتيح — سلوك الكتابة ================= */
 
@@ -1175,27 +1408,43 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
           {pages !== null && !error && !page && (
             <section className="notes-list" aria-label="ملاحظات اليوم">
-              {noteCards.length === 0 ? (
+              <div className="notes-scope-switch" aria-label="نطاق الملاحظات">
+                <button
+                  type="button"
+                  className={notesScope === 'day' ? 'active' : ''}
+                  onClick={() => setNotesScope('day')}
+                >
+                  اليوم
+                </button>
+                <button
+                  type="button"
+                  className={notesScope === 'all' ? 'active' : ''}
+                  onClick={() => setNotesScope('all')}
+                >
+                  كل الملاحظات
+                </button>
+              </div>
+
+              {visibleNoteCards.length === 0 ? (
                 <button type="button" className="empty-note-card" onClick={addNotePage}>
-                  <span>لا توجد ملاحظات بعد</span>
+                  <span>{notesScope === 'all' ? 'لا توجد ملاحظات' : 'لا توجد ملاحظات اليوم'}</span>
                   <strong>ابدأ ملاحظة جديدة</strong>
                   <p>اكتب فكرة، مهمة، أو صفحة كاملة لهذا اليوم.</p>
                 </button>
-	              ) : (
-	                noteCards.map((card) => (
-	                  <button
-	                    key={card.page.id}
-	                    type="button"
-	                    className="note-card"
-	                    onClick={() => {
-	                      setActivePageId(card.page.id);
-	                      setFocusedId(null);
-	                      setFormatMenuOpen(false);
-	                    }}
-	                  >
-	                    <span className="note-card-index">ملاحظة {card.page.page_no}</span>
-	                    <strong>{card.title}</strong>
-	                    <p>{card.preview}</p>
+		              ) : (
+		                visibleNoteCards.map((card) => (
+		                  <button
+		                    key={card.page.id}
+		                    type="button"
+		                    className="note-card"
+		                    onClick={() => openNoteCard(card.page)}
+		                  >
+		                    <span className="note-card-index">
+                          {notesScope === 'all' ? `${card.dateLabel} · ` : ''}
+                          ملاحظة {card.page.page_no}
+                        </span>
+		                    <strong>{card.title}</strong>
+		                    <p>{card.preview}</p>
 	                    <span className="note-card-meta">
 	                      {card.lineCount || 'بدون'} سطر
 	                      {card.taskCount > 0 && ` · ${card.doneCount}/${card.taskCount} مهام`}
@@ -1208,30 +1457,31 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
           {pages !== null && !error && page && (
             <div
-              className={`paper-lines${selectMode ? ' select-mode' : ''}`}
+              className={`paper-lines${selectMode ? ' select-mode' : ''}${draggingId ? ' is-dragging' : ''}`}
               ref={paperLinesRef}
               onPointerDown={() => {
                 // مثل آبل: لمس الورقة يغلق لوحة التنسيق المفتوحة
                 if (formatMenuOpen) setFormatMenuOpen(false);
               }}
               onClick={(e) => {
-                if (selectMode) return;
+                if (selectMode || draggingId) return;
                 // لا ننشئ سطراً إذا كان هناك تحديد نص قائم — النقرة تتبع نهاية السحب
                 const selection = window.getSelection();
                 if (selection && !selection.isCollapsed) return;
                 if (e.target === paperLinesRef.current) appendAtEnd();
               }}
-              onDragOver={(e) => {
-                if (!draggingId) return;
-                e.preventDefault();
-                dragOverPoint(e.clientX, e.clientY);
-              }}
-              onDrop={(e) => {
-                if (!draggingId) return;
-                e.preventDefault();
-                finishDropAction();
-              }}
             >
+              {/* مؤشر الإدراج — خط بمستوى الفتحة المستهدفة (جذر/فرعي) */}
+              {dropSlot?.kind === 'gap' && (
+                <span
+                  className="drop-line"
+                  aria-hidden="true"
+                  style={{
+                    top: `${dropSlot.top}px`,
+                    insetInlineStart: dropSlot.indent ? '58px' : '14px',
+                  }}
+                />
+              )}
               {rows.length === 0 ? (
                 <button type="button" className="paper-starter" onClick={startWriting}>
                   اضغط هنا وابدأ الكتابة…
@@ -1265,19 +1515,12 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
                     }
                     dragging={draggingId === row.block.id}
                     anyDragging={Boolean(draggingId)}
-                    isNestTarget={dropTargetId === row.block.id && draggingId !== row.block.id}
-                    isDropEdge={Boolean(draggingId) && dropEdge === row.block.id}
-                    onDragStartRow={(id) => {
-                      setDraggingId(id);
-                      setDropTargetId(null);
-                      setDropEdge(null);
-                    }}
-                    onDragEnd={finishDrag}
-                    onDragHover={dragOverPoint}
-                    onDropCommit={finishDropAction}
-                    onCircleDragStart={beginCircleDrag}
-                    onCircleDragMove={dragOverPoint}
-                    onCircleDragEnd={finishDropAction}
+                    isNestTarget={
+                      dropSlot?.kind === 'nest' && dropSlot.targetId === row.block.id
+                    }
+                    onDragBegin={beginTaskDrag}
+                    onDragMove={moveTaskDrag}
+                    onDragFinish={endTaskDrag}
                     onSwipeIndent={() => {
                       if (row.depth === 0) indentUnderPrevious(row);
                     }}
@@ -1289,20 +1532,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
               )}
               <button
                 type="button"
-                className={`paper-tail${draggingId && dropEdge === 'end' ? ' drop-target' : ''}`}
+                className="paper-tail"
                 aria-label="متابعة الكتابة في نهاية الصفحة"
                 onClick={appendAtEnd}
-                onDragOver={(e) => {
-                  if (!draggingId) return;
-                  e.preventDefault();
-                  setDropTargetId(null);
-                  setDropEdge('end');
-                }}
-                onDrop={(e) => {
-                  if (!draggingId) return;
-                  e.preventDefault();
-                  finishDropAction();
-                }}
               />
             </div>
           )}
@@ -1311,6 +1543,18 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
           <footer className="paper-foot" />
         </div>
       </div>
+
+      {/* بطاقة الشبح — تتبع الإصبع أثناء سحب مهمة */}
+      {dragGhost && (
+        <div className="drag-ghost" ref={ghostRef} style={{ width: `${dragGhost.width}px` }}>
+          <div className="drag-ghost-card">
+            <span className={`drag-ghost-circle${dragGhost.done ? ' done' : ''}`}>
+              <CheckIcon size={12} />
+            </span>
+            <span className="drag-ghost-text">{dragGhost.text}</span>
+          </div>
+        </div>
+      )}
 
       {/* شريط وضع التحديد */}
       {selectMode && (
@@ -1482,7 +1726,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
  * سطر واحد في المستند — مثل فقرة/عنصر قائمة في ملاحظات آبل.
  * النصوص العادية: بلا دائرة. المهام: دائرة تمتلئ برتقالياً عند الإكمال
  * بلا شطب للنص (سلوك آبل). السحب الأفقي على المهمة يزيحها، والضغط
- * المطول على الدائرة يلتقطها لإعادة الترتيب.
+ * المطول على الدائرة (أو سحبها مباشرة بالفأرة) يلتقطها لإعادة الترتيب.
  */
 function PaperLine({
   row,
@@ -1499,14 +1743,9 @@ function PaperLine({
   dragging,
   anyDragging,
   isNestTarget,
-  isDropEdge,
-  onDragStartRow,
-  onDragEnd,
-  onDragHover,
-  onDropCommit,
-  onCircleDragStart,
-  onCircleDragMove,
-  onCircleDragEnd,
+  onDragBegin,
+  onDragMove,
+  onDragFinish,
   onSwipeIndent,
   onSwipeOutdent,
 }) {
@@ -1515,8 +1754,13 @@ function PaperLine({
   const bold = isBold(block.content);
   const longPressTimer = useRef(null);
   const circleDraggingRef = useRef(false);
+  const didDragRef = useRef(false);
+  const pressRef = useRef(null);
   const selectPointerRef = useRef(null);
   const swipeRef = useRef(null);
+
+  // مؤقّت الضغط المطول لا يعيش أطول من السطر نفسه
+  useEffect(() => () => clearTimeout(longPressTimer.current), []);
 
   const displayValue = contentToHtml(block.content);
   const editorRef = useRef(null);
@@ -1568,22 +1812,11 @@ function PaperLine({
         isTask ? 'is-task' : '',
         isTask && block.is_completed ? 'done' : '',
         bold ? 'is-bold' : '',
-        isDropEdge ? 'drop-target' : '',
         isNestTarget ? 'subtask-drop-target' : '',
         dragging ? 'dragging' : '',
       ]
         .filter(Boolean)
         .join(' ')}
-      onDragOver={(e) => {
-        if (!anyDragging || dragging) return;
-        e.preventDefault();
-        onDragHover(e.clientX, e.clientY);
-      }}
-      onDrop={(e) => {
-        if (!anyDragging) return;
-        e.preventDefault();
-        onDropCommit();
-      }}
       onPointerDown={(e) => {
         if (selectMode || !isTask) return;
         if (e.target.closest?.('.line-circle')) return;
@@ -1611,50 +1844,81 @@ function PaperLine({
             role="checkbox"
             aria-checked={block.is_completed}
             aria-label={block.is_completed ? 'إلغاء الإكمال' : 'إكمال المهمة'}
-            draggable={!selectMode}
-            onDragStart={(e) => {
-              e.dataTransfer.effectAllowed = 'move';
-              e.dataTransfer.setData('text/plain', block.id);
-              onDragStartRow(block.id);
-            }}
-            onDragEnd={onDragEnd}
             onPointerDown={(e) => {
-              if (selectMode) return;
+              if (selectMode || anyDragging) return;
               if (e.pointerType === 'mouse' && e.button !== 0) return;
               // نلتقط العنصر والمؤشر الآن — currentTarget يصير null بعد انتهاء الحدث
               const circleEl = e.currentTarget;
               const pointerId = e.pointerId;
               circleDraggingRef.current = false;
-              clearTimeout(longPressTimer.current);
-              longPressTimer.current = setTimeout(() => {
+              didDragRef.current = false;
+
+              const startDrag = () => {
+                const press = pressRef.current;
+                if (!press || circleDraggingRef.current) return;
+                const rowEl = circleEl.closest('.paper-line');
+                const width = rowEl
+                  ? rowEl.getBoundingClientRect().width - 20
+                  : 260;
+                const x = press.lastX ?? press.x;
+                const y = press.lastY ?? press.y;
+                if (!onDragBegin(block, x, y, width)) return;
                 circleDraggingRef.current = true;
+                didDragRef.current = true;
                 try {
                   circleEl.setPointerCapture?.(pointerId);
                 } catch {
                   /* المؤشر لم يعد نشطاً — نكمل السحب بدون capture */
                 }
-                onCircleDragStart(block.id);
-              }, 360);
+              };
+
+              pressRef.current = {
+                x: e.clientX,
+                y: e.clientY,
+                type: e.pointerType,
+                startDrag,
+              };
+              clearTimeout(longPressTimer.current);
+              // الفأرة تلتقط أسرع، واللمس بضغطة مطولة قصيرة — مثل آبل
+              const delay = e.pointerType === 'mouse' ? 180 : 300;
+              longPressTimer.current = setTimeout(startDrag, delay);
             }}
             onPointerMove={(e) => {
-              if (circleDraggingRef.current) onCircleDragMove(e.clientX, e.clientY);
+              if (circleDraggingRef.current) {
+                onDragMove(e.clientX, e.clientY);
+                return;
+              }
+              const press = pressRef.current;
+              if (!press) return;
+              press.lastX = e.clientX;
+              press.lastY = e.clientY;
+              // بالفأرة: تحريك ٦px يبدأ السحب فوراً دون انتظار المؤقّت
+              const dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
+              if (press.type === 'mouse' && dist > 6) {
+                clearTimeout(longPressTimer.current);
+                press.startDrag();
+              }
             }}
             onPointerUp={() => {
               clearTimeout(longPressTimer.current);
+              pressRef.current = null;
               if (circleDraggingRef.current) {
                 circleDraggingRef.current = false;
-                onCircleDragEnd();
+                onDragFinish(true);
               }
             }}
             onPointerCancel={() => {
               clearTimeout(longPressTimer.current);
+              pressRef.current = null;
               if (circleDraggingRef.current) {
                 circleDraggingRef.current = false;
-                onDragEnd();
+                onDragFinish(false);
               }
             }}
             onClick={(e) => {
-              if (selectMode || circleDraggingRef.current || dragging) {
+              // بعد سحبة لا تُحتسب النقرة إكمالاً للمهمة
+              if (selectMode || didDragRef.current || dragging) {
+                didDragRef.current = false;
                 e.preventDefault();
                 return;
               }

@@ -10,6 +10,11 @@
   max-height: calc(100dvh - var(--tabbar-height) - var(--safe-bottom));
   overflow: hidden;
   padding: calc(var(--safe-top) + var(--space-2)) var(--space-4) var(--space-3);
+  --calendar-warm: #ff9f0a;
+  --calendar-warm-2: #e7ad52;
+  --calendar-warm-soft: #ffd39a;
+  --calendar-warm-glow: rgba(255, 159, 10, 0.12);
+  --calendar-honey-glass: rgba(255, 159, 10, 0.055);
 }
 
 .calendar-screen::before {
@@ -19,10 +24,10 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 5%, rgba(255, 255, 255, 0.18), transparent 28%),
-    radial-gradient(circle at 86% 24%, rgba(92, 120, 255, 0.18), transparent 30%),
+    radial-gradient(circle at 18% 5%, rgba(255, 255, 255, 0.075), transparent 30%),
+    radial-gradient(circle at 86% 24%, rgba(255, 159, 10, 0.045), transparent 30%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 38%);
-  opacity: 0.72;
+  opacity: 0.82;
 }
 
 /* ---------- الرأس المضغوط ---------- */
@@ -71,8 +76,8 @@
   gap: 6px;
   padding-inline: 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #d6e0ef;
+  background: rgba(255, 255, 255, 0.075);
+  color: #f5f5f5;
   font-size: 13px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -127,8 +132,8 @@
   display: grid;
   place-items: center;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #d6e0ef;
+  background: rgba(255, 255, 255, 0.085);
+  color: #f6f6f6;
 }
 
 .countdown-hero-copy {
@@ -150,7 +155,7 @@
 .countdown-hero-copy small,
 .countdown-hero-days small {
   font-size: 12px;
-  color: #9ba8ba;
+  color: rgba(255, 255, 255, 0.56);
 }
 
 .countdown-hero-days {
@@ -161,7 +166,7 @@
   gap: 2px;
   padding: 10px 12px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.075);
 }
 
 .countdown-hero-days strong {
@@ -170,6 +175,7 @@
   line-height: 1;
   color: #fff;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.14);
 }
 
 .countdown-hero-add {
@@ -182,6 +188,7 @@
   color: #000;
   font-size: 13px;
   font-weight: 800;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.18);
 }
 
 /* ---------- لقطة المهام ---------- */
@@ -220,34 +227,34 @@
 }
 
 .task-preview-late {
-  border-color: rgba(255, 122, 122, 0.18);
+  border-color: rgba(255, 255, 255, 0.09);
   background:
-    radial-gradient(circle at 100% 0, rgba(255, 115, 115, 0.12), transparent 42%),
+    radial-gradient(circle at 100% 0, rgba(255, 159, 10, 0.045), transparent 42%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.02));
 }
 
 .task-preview-late::before {
-  background: #ff7a7a;
+  background: rgba(255, 159, 10, 0.72);
 }
 
 .task-preview-today {
   background:
-    radial-gradient(circle at 100% 0, rgba(97, 231, 146, 0.11), transparent 44%),
+    radial-gradient(circle at 100% 0, rgba(255, 255, 255, 0.045), transparent 44%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.02));
 }
 
 .task-preview-today::before {
-  background: #73e29a;
+  background: rgba(255, 255, 255, 0.68);
 }
 
 .task-preview-next {
   background:
-    radial-gradient(circle at 100% 0, rgba(132, 172, 255, 0.13), transparent 44%),
+    radial-gradient(circle at 100% 0, rgba(255, 255, 255, 0.035), transparent 44%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.02));
 }
 
 .task-preview-next::before {
-  background: #8db1ff;
+  background: rgba(255, 255, 255, 0.36);
 }
 
 .task-preview-head {
@@ -275,8 +282,8 @@
   min-height: 28px;
   padding-inline: 9px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  color: #d6e0ef;
+  background: rgba(255, 255, 255, 0.075);
+  color: #f4f4f4;
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
@@ -294,13 +301,102 @@
   gap: 8px;
 }
 
-.task-preview-empty {
-  height: 100%;
-  display: grid;
-  place-items: center start;
-  padding-inline: 2px;
+/* إضافة سريعة داخل قسم اليوم — تستغل المساحة المتبقية عند قلة المهام */
+.task-preview-add {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
   color: var(--label-tertiary);
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+
+.task-preview-add:active {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--label-secondary);
+}
+
+/* قسم فارغ: ينكمش لشريط رفيع — عنوانه وعلامة "نظيف" في سطر واحد */
+.task-preview.is-collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding-block: 6px;
+}
+
+.task-preview.is-collapsed h2 {
+  font-size: 13.5px;
+  font-weight: 850;
+}
+
+.task-preview-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-tertiary);
+}
+
+.task-preview-clear svg {
+  flex-shrink: 0;
+  color: rgba(255, 159, 10, 0.78);
+  opacity: 0.85;
+}
+
+/* لا مهام إطلاقاً: حالة واحدة ودّية بدل ثلاث بطاقات فارغة */
+.task-snapshot-empty {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px;
+  text-align: center;
+  border-radius: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.task-snapshot-empty svg {
+  color: rgba(255, 159, 10, 0.78);
+  opacity: 0.9;
+}
+
+.task-snapshot-empty strong {
+  font-size: 17px;
+  font-weight: 850;
+  color: var(--label);
+}
+
+.task-snapshot-empty p {
   font-size: 13px;
+  color: var(--label-tertiary);
+}
+
+.task-snapshot-empty button {
+  margin-top: 6px;
+  min-height: 38px;
+  padding-inline: 16px;
+  border-radius: 999px;
+  background: #fff;
+  color: #000;
+  font-size: 13.5px;
+  font-weight: 800;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.18);
 }
 
 .task-preview-row {
@@ -366,8 +462,8 @@
   min-height: 28px;
   padding-inline: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #d6e0ef;
+  background: rgba(255, 255, 255, 0.075);
+  color: #f4f4f4;
   font-size: 12px;
   font-weight: 800;
 }
@@ -453,7 +549,9 @@
 .calendar-day.today .calendar-day-num {
   background: #fff;
   color: #000;
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.42);
+  box-shadow:
+    0 0 0 2px rgba(255, 159, 10, 0.18),
+    0 0 16px rgba(255, 255, 255, 0.28);
 }
 
 .calendar-dots {
@@ -482,8 +580,8 @@
 .calendar-dot.countdown {
   width: 12px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #fff, rgba(255, 255, 255, 0.38));
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
+  background: linear-gradient(90deg, #fff, rgba(255, 159, 10, 0.62));
+  box-shadow: 0 0 8px var(--calendar-warm-glow);
 }
 
 .calendar-sheet-hint {
@@ -516,9 +614,9 @@
 }
 
 .composer-day.active {
-  background: var(--tint);
-  color: var(--on-tint);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.28);
+  background: #fff;
+  color: #000;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.18);
 }
 
 /* ---------- بطاقات العدادات (داخل الورقة) ---------- */
@@ -614,7 +712,7 @@
 .countdown-now {
   font-size: 25px;
   font-weight: 850;
-  color: var(--success);
+  color: #fff;
 }
 
 .countdown-past {
@@ -634,8 +732,8 @@
   display: block;
   block-size: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.55), #fff);
-  box-shadow: 0 0 14px rgba(255, 255, 255, 0.36);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.74), rgba(255, 159, 10, 0.62));
+  box-shadow: 0 0 12px var(--calendar-warm-glow);
 }
 
 .countdown-date {
