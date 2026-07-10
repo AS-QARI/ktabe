@@ -1,131 +1,108 @@
-/* شاشة الملخص: مختصرة ومكثفة قدر الإمكان لتقليل الحاجة للسكرول. */
+/* شاشة الملخص — لوحة واحدة ثابتة تملأ الشاشة تماماً بلا تمرير:
+   ثلاث مناطق (بطل اليوم / مؤشرات / أسبوع) تتقاسم الارتفاع بنِسَب fr
+   فلا يبقى فراغ ميت ولا يفيض المحتوى مهما تغيّر ارتفاع الجهاز. */
 
 .summary-screen {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  height: calc(100dvh - var(--tabbar-height) - var(--safe-bottom));
+  overflow: hidden;
+  padding: calc(var(--safe-top) + var(--space-2)) var(--space-4) var(--space-3);
+}
+
+/* إضاءة محيطية هادئة كهوية شاشة التقويم */
+.summary-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 84% 0%, rgba(173, 196, 228, 0.15), transparent 30%),
+    radial-gradient(circle at 10% 92%, rgba(255, 255, 255, 0.06), transparent 30%);
+  opacity: 0.85;
+}
+
+/* ---------- الرأس المضغوط ---------- */
+
+.summary-head {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block: var(--space-1) var(--space-1);
 }
 
-.summary-screen .screen-header {
-  padding-block: var(--space-1) var(--space-2);
+.summary-head h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  line-height: 1.15;
 }
 
-.summary-hero,
-.summary-board,
-.compact-stat {
+.summary-date {
+  margin-top: 1px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-secondary);
+}
+
+.summary-error {
+  flex-basis: 100%;
+  margin-block: var(--space-1) 0;
+}
+
+/* ---------- جسم اللوحة: ثلاث مناطق تتقاسم الارتفاع ---------- */
+
+.sum-body {
+  display: grid;
+  grid-template-rows: minmax(0, 1.06fr) minmax(0, 0.6fr) minmax(0, 1.1fr);
+  gap: 10px;
+  min-height: 0;
+}
+
+.sum-body.is-loading {
+  grid-template-rows: 1fr;
+  place-items: center;
+}
+
+.sum-card {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  min-height: 0;
+  border-radius: var(--radius-l);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
-.summary-hero,
-.summary-board {
-  border-radius: 22px;
-}
+/* ---------- ١) بطل اليوم ---------- */
 
-.summary-hero::before,
-.summary-board::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at top right, rgba(173, 196, 228, 0.14), transparent 34%),
-    radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.05), transparent 24%);
-}
-
-.summary-hero {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-4);
-}
-
-.summary-hero-main {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.summary-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.today-copy {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.today-copy h2 {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.45px;
-  line-height: 1.1;
-  color: #f8fafc;
-}
-
-.today-copy p {
-  font-size: 14px;
-  line-height: 1.55;
-  color: #b6c1d1;
-  max-width: 30ch;
-}
-
-.today-pills {
-  position: relative;
-  z-index: 1;
+.sum-hero {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 14px 16px 15px;
+  background:
+    radial-gradient(circle at 88% -12%, rgba(173, 196, 228, 0.16), transparent 44%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
 }
 
-.metric-pill {
+.sum-hero-top {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-height: 60px;
-  padding: 10px 12px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.metric-pill-success {
-  background: linear-gradient(180deg, rgba(124, 214, 163, 0.14), rgba(124, 214, 163, 0.06));
-  border-color: rgba(124, 214, 163, 0.18);
-}
-
-.metric-pill-value {
-  font-size: 21px;
-  font-weight: 800;
-  letter-spacing: -0.35px;
-  color: #f8fafc;
-}
-
-.metric-pill-label {
-  font-size: 12px;
-  color: #94a3b8;
+  align-items: center;
+  gap: 14px;
+  min-height: 0;
 }
 
 .ring-wrap {
   position: relative;
-  z-index: 1;
-  width: 104px;
-  height: 104px;
+  width: 112px;
+  aspect-ratio: 1;
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -144,8 +121,9 @@
   stroke-linecap: round;
 }
 
+/* مسار الحلقة درجة أفتح من لون التعبئة نفسه — لا رمادي محايد */
 .ring-track {
-  stroke: rgba(163, 177, 196, 0.14);
+  stroke: rgba(173, 196, 228, 0.16);
 }
 
 .ring-fill {
@@ -155,204 +133,415 @@
 }
 
 .ring-value {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.4px;
-  color: #e2e8f0;
+  color: #f0f5fb;
 }
 
-.summary-board {
+.sum-hero-copy {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: 5px;
 }
 
-.summary-board-head {
-  position: relative;
-  z-index: 1;
-  display: flex;
+.sum-eyebrow {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
+  width: fit-content;
+  min-height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(173, 196, 228, 0.13);
+  color: #c3d3e8;
+  font-size: 11.5px;
+  font-weight: 700;
 }
 
-.summary-board-head h2 {
-  font-size: 18px;
+.sum-hero-copy h2 {
+  font-size: 21px;
   font-weight: 800;
-  letter-spacing: -0.25px;
+  letter-spacing: -0.35px;
+  line-height: 1.18;
   color: #f8fafc;
 }
 
-.summary-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  color: #b8c7dc;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
+.sum-hero-copy p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #b6c1d1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.week-strip {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+/* عدّاد مهام اليوم: مقاطع بعدد المهام، والمُنجز منها بلون التمييز */
+
+.sum-meter-block {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.week-strip-day {
+.sum-meter {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
+  gap: 3px;
+  height: 7px;
 }
 
-.week-strip-track {
-  width: 100%;
-  height: 56px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 6px 0;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.035);
-}
-
-.week-strip-bar {
-  width: 100%;
-  max-width: 18px;
-  min-height: 8px;
+.sum-meter-seg {
+  flex: 1;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(148, 163, 184, 0.34), rgba(148, 163, 184, 0.82));
+  background: rgba(173, 196, 228, 0.16);
 }
 
-.week-strip-bar.is-today {
-  background: linear-gradient(180deg, #d7e4f7, #adc4e4);
-  box-shadow: 0 0 14px rgba(173, 196, 228, 0.18);
+.sum-meter-seg.done {
+  background: #adc4e4;
+  box-shadow: 0 0 8px rgba(173, 196, 228, 0.22);
 }
 
-.week-strip-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #8b9ab0;
+.sum-meter-solid {
+  display: block;
+  border-radius: 999px;
+  background: rgba(173, 196, 228, 0.16);
+  overflow: hidden;
 }
 
-.compact-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+.sum-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #adc4e4;
+  box-shadow: 0 0 8px rgba(173, 196, 228, 0.22);
 }
 
-.compact-stat {
+.sum-meter-row {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 82px;
-  padding: 10px;
-  border-radius: 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
 }
 
-.compact-stat-icon {
+.sum-meter-main {
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.sum-meter-side {
+  font-weight: 700;
+  color: #9fb0c6;
+}
+
+.sum-meter-hint {
+  font-size: 13px;
+  font-weight: 700;
+  color: #9fb0c6;
+}
+
+/* ---------- ٢) صف المؤشرات ---------- */
+
+.sum-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-height: 0;
+}
+
+.stat-tile {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  align-content: space-between;
+  gap: 4px;
+  padding: 11px 14px 12px;
+}
+
+.stat-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.stat-icon {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 9px;
   color: #adc4e4;
-  background: rgba(173, 196, 228, 0.12);
+  background: rgba(173, 196, 228, 0.13);
 }
 
-.compact-stat-value {
-  font-size: 22px;
+/* سلسلة مشتعلة — حالة حقيقية وليست زخرفة */
+.stat-icon.warm {
+  color: #ffb03a;
+  background: rgba(255, 159, 26, 0.14);
+}
+
+.stat-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #93a3ba;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-value {
+  font-size: 27px;
   font-weight: 800;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.4px;
   line-height: 1;
   color: #f8fafc;
 }
 
-.compact-stat-label {
+.stat-unit {
+  margin-inline-start: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #9fb0c6;
+}
+
+.stat-sub {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #7e8ea3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- ٣) آخر ٧ أيام ---------- */
+
+.sum-week {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 13px 16px 12px;
+  background:
+    radial-gradient(circle at 8% 110%, rgba(255, 255, 255, 0.05), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018));
+}
+
+.sum-week-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sum-week-head h2 {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #a9b8cc;
+}
+
+.sum-week-total {
   font-size: 12px;
-  line-height: 1.35;
+  font-weight: 700;
   color: #8fa0b7;
 }
 
-@media (max-width: 420px) {
+.sum-week-total b {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: #f8fafc;
+  margin-inline-end: 4px;
+}
+
+/* الرسم: خط قاعدة رفيع واحد فوق صف التسميات، والأعمدة تنبت منه */
+.wk-chart {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  min-height: 0;
+}
+
+.wk-chart::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 20px; /* ارتفاع التسمية ١٤ + فجوة ٦ */
+  height: 1px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.wk-col {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 6px;
+  min-height: 0;
+}
+
+.wk-zone {
+  position: relative;
+  min-height: 0;
+}
+
+.wk-bar {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(58%, 18px);
+  height: var(--h, 0%);
+  border-radius: 5px 5px 0 0; /* قمة مدوّرة، قاعدة مستقيمة */
+  background: rgba(148, 163, 184, 0.42);
+}
+
+.wk-bar.is-today {
+  background: linear-gradient(180deg, #d7e4f7, #a9c3e8);
+  box-shadow: 0 0 12px rgba(173, 196, 228, 0.2);
+}
+
+.wk-bar.is-zero {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+}
+
+/* قيمة القمة — فوق أعلى يوم واليوم الحالي فقط، لا على كل عمود */
+.wk-cap {
+  position: absolute;
+  bottom: calc(var(--h, 0%) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #aebfd6;
+}
+
+.wk-day {
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7c8ba1;
+}
+
+.wk-day.is-today {
+  color: #e2ecf9;
+}
+
+.sum-week-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8fa0b7;
+}
+
+.sum-week-foot b {
+  font-size: 13px;
+  font-weight: 800;
+  color: #eef3fa;
+}
+
+/* ---------- تكيّف الارتفاعات القصيرة والشاشات الضيقة ---------- */
+
+@media (max-height: 760px) {
   .summary-screen {
-    gap: 10px;
+    gap: var(--space-1);
   }
 
-  .summary-hero,
-  .summary-board {
-    padding: var(--space-3);
-    border-radius: 20px;
-  }
-
-  .summary-hero-main {
-    gap: var(--space-3);
+  .sum-body {
+    gap: 8px;
   }
 
   .ring-wrap {
-    width: 94px;
-    height: 94px;
+    width: 100px;
   }
 
   .ring-value {
-    font-size: 22px;
+    font-size: 23px;
   }
 
-  .today-copy h2 {
-    font-size: 22px;
+  .sum-hero {
+    padding: 12px 14px 13px;
   }
 
-  .today-copy p {
-    font-size: 13px;
-  }
-
-  .metric-pill {
-    min-height: 56px;
-    padding: 9px 10px;
-  }
-
-  .metric-pill-value {
+  .sum-hero-copy h2 {
     font-size: 19px;
   }
 
-  .summary-board-head h2 {
-    font-size: 17px;
+  .stat-value {
+    font-size: 24px;
   }
 
-  .summary-chip {
-    font-size: 11px;
-  }
-
-  .week-strip-track {
-    height: 50px;
-  }
-
-  .compact-stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .compact-stat {
-    min-height: 74px;
+  .sum-week {
+    padding: 11px 14px 10px;
   }
 }
 
-@media (max-width: 390px) {
-  .summary-hero-main {
-    align-items: flex-start;
+@media (max-height: 672px) {
+  .ring-wrap {
+    width: 86px;
   }
 
-  .today-copy h2 {
+  .ring-value {
     font-size: 20px;
   }
 
-  .today-pills {
+  .sum-hero-top {
+    gap: 11px;
+  }
+
+  .sum-hero-copy p {
+    -webkit-line-clamp: 1;
+  }
+
+  .sum-hero-copy h2 {
+    font-size: 17.5px;
+  }
+
+  .sum-eyebrow {
+    display: none;
+  }
+
+  .stat-value {
+    font-size: 21px;
+  }
+
+  .stat-sub {
+    display: none;
+  }
+
+  .summary-head h1 {
+    font-size: 23px;
+  }
+}
+
+@media (max-width: 380px) {
+  .sum-body,
+  .sum-tiles {
     gap: 8px;
+  }
+
+  .sum-hero-top {
+    gap: 12px;
+  }
+
+  .ring-wrap {
+    width: 96px;
+  }
+
+  .stat-tile {
+    padding: 10px 12px 11px;
+  }
+
+  .sum-hero,
+  .sum-week {
+    padding-inline: 13px;
   }
 }

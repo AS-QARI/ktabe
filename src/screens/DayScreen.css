@@ -72,132 +72,42 @@
   margin-inline-start: auto;
 }
 
-/* ---------- لوحة اليوم ---------- */
+/* ---------- تنقل اليوم المضغوط ---------- */
 
-.day-command-card {
+.day-compact-nav {
   position: relative;
   z-index: 1;
-  flex-shrink: 0;
-  border-radius: 28px;
-  padding: 16px;
-  margin-bottom: var(--space-3);
-  background:
-    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.17), transparent 27%),
-    linear-gradient(145deg, rgba(36, 36, 42, 0.92), rgba(10, 10, 12, 0.88));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 18px 48px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
-}
-
-.day-command-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-4);
-}
-
-.day-command-kicker {
-  display: inline-flex;
-  min-height: 26px;
-  align-items: center;
-  padding-inline: 10px;
-  border-radius: 999px;
-  background: rgba(255, 159, 10, 0.16);
-  color: #ffd39a;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.day-command-head h1 {
-  margin-top: var(--space-2);
-  font-size: 30px;
-  line-height: 1.05;
-  font-weight: 900;
-  letter-spacing: -0.7px;
-}
-
-.day-command-head p {
-  margin-top: 3px;
-  color: var(--label-secondary);
-  font-size: 13px;
-}
-
-.day-progress-orb {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
   display: grid;
-  place-items: center;
-  align-content: center;
-  background:
-    radial-gradient(circle, #101014 56%, transparent 57%),
-    conic-gradient(var(--checklist-accent) var(--progress), rgba(255, 255, 255, 0.1) 0);
-  box-shadow:
-    0 0 22px rgba(255, 159, 10, 0.12),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
-}
-
-.day-progress-orb strong {
-  font-size: 17px;
-  line-height: 1;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-}
-
-.day-progress-orb span {
-  margin-top: 2px;
-  color: var(--label-tertiary);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.day-focus-strip {
-  display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
   gap: var(--space-2);
-  align-items: center;
-  min-height: 42px;
-  margin-top: var(--space-3);
-  padding: 8px 10px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.day-focus-strip span {
-  color: var(--label-tertiary);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.day-focus-strip strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
+  flex-shrink: 0;
+  margin-bottom: 8px;
 }
 
 .day-rail {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: var(--space-3);
+  gap: 5px;
+  min-width: 0;
+  padding: 5px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
 }
 
 .day-rail-item {
   min-width: 0;
-  min-height: 58px;
+  min-height: 48px;
   display: grid;
   place-items: center;
   align-content: center;
   gap: 2px;
-  border-radius: 18px;
+  border-radius: 15px;
   color: var(--label-secondary);
-  background: rgba(255, 255, 255, 0.055);
+  background: transparent;
   border: 1px solid transparent;
   transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast);
 }
@@ -207,12 +117,12 @@
 }
 
 .day-rail-item span {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 750;
 }
 
 .day-rail-item strong {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
 }
@@ -227,31 +137,31 @@
   box-shadow: 0 0 18px rgba(255, 255, 255, 0.26);
 }
 
-.day-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: var(--space-3);
-}
-
-.day-metrics span {
-  min-height: 42px;
+.day-progress-pill {
+  min-width: 58px;
+  border-radius: 19px;
   display: grid;
   place-items: center;
   align-content: center;
-  border-radius: 15px;
-  background: rgba(255, 255, 255, 0.055);
-  color: var(--label-tertiary);
-  font-size: 11px;
-  font-weight: 700;
+  background:
+    radial-gradient(circle, #101014 54%, transparent 55%),
+    conic-gradient(var(--checklist-accent) var(--progress), rgba(255, 255, 255, 0.1) 0);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.day-metrics strong {
-  display: block;
-  color: var(--label);
-  font-size: 16px;
+.day-progress-pill strong {
+  font-size: 13px;
+  line-height: 1;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
+}
+
+.day-progress-pill span {
+  margin-top: 2px;
+  color: var(--label-tertiary);
+  font-size: 9px;
+  font-weight: 800;
 }
 
 /* ---------- الكتاب والورقة ---------- */
@@ -376,14 +286,17 @@
 /* ---------- رأس الورقة ---------- */
 
 .paper-head {
-  min-height: 96px;
+  min-height: 112px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: 12px;
+  padding: 10px 12px 8px;
   flex-shrink: 0;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+}
+
+.paper-head.note-open {
+  min-height: 104px;
 }
 
 .paper-date {
@@ -408,17 +321,37 @@
   color: var(--label-secondary);
 }
 
-.page-turn {
-  width: 48px;
-  height: 48px;
+.note-back,
+.note-add-head {
+  min-width: 42px;
+  height: 42px;
   border-radius: 50%;
-  display: grid;
+  display: inline-grid;
   place-items: center;
   color: var(--tint);
+  background: rgba(255, 255, 255, 0.065);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   transition: background var(--dur-fast), transform var(--dur-fast) var(--ease-out);
+  flex-shrink: 0;
 }
 
-.page-turn:active {
+.note-back {
+  width: auto;
+  padding-inline: 13px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--label-secondary);
+}
+
+.note-add-head {
+  font-size: 28px;
+  line-height: 1;
+  color: var(--checklist-accent);
+}
+
+.note-back:active,
+.note-add-head:active {
   background: var(--fill);
   transform: scale(0.9);
 }
@@ -432,15 +365,154 @@
   background: transparent;
   color: var(--label);
   text-align: center;
-  font-size: 23px;
+  font-size: 22px;
   line-height: 1.15;
   font-weight: 800;
   padding: 4px 8px 0;
   caret-color: var(--tint);
 }
 
+.page-strip {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 0 12px 10px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+
+.page-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.page-chip {
+  flex: 0 0 auto;
+  max-width: 150px;
+  min-height: 34px;
+  padding-inline: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--label-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 13px;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-chip.active {
+  background: #fff;
+  color: #000;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.2);
+}
+
+.page-chip.add {
+  width: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--checklist-accent);
+  font-size: 22px;
+  line-height: 1;
+}
+
 .day-title-input::placeholder {
   color: var(--label-tertiary);
+}
+
+.notes-title {
+  margin: 4px 0 0;
+  font-size: 27px;
+  line-height: 1.05;
+  font-weight: 900;
+  letter-spacing: -0.6px;
+}
+
+.notes-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 12px calc(var(--tabbar-height) + var(--safe-bottom) + 96px);
+  scrollbar-width: none;
+}
+
+.notes-list::-webkit-scrollbar {
+  display: none;
+}
+
+.note-card,
+.empty-note-card {
+  width: 100%;
+  border-radius: 24px;
+  padding: 16px;
+  text-align: start;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.1), transparent 30%),
+    rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast);
+}
+
+.note-card:active,
+.empty-note-card:active {
+  transform: scale(0.985);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.note-card-index,
+.empty-note-card span {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding-inline: 9px;
+  border-radius: 999px;
+  background: rgba(255, 159, 10, 0.13);
+  color: #ffd39a;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.note-card strong,
+.empty-note-card strong {
+  display: block;
+  margin-top: 10px;
+  color: var(--label);
+  font-size: 20px;
+  line-height: 1.18;
+  font-weight: 900;
+  letter-spacing: -0.3px;
+}
+
+.note-card p,
+.empty-note-card p {
+  display: -webkit-box;
+  margin-top: 7px;
+  color: var(--label-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-card-meta {
+  display: block;
+  margin-top: 12px;
+  color: var(--label-tertiary);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.empty-note-card {
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 /* ---------- مساحة الأسطر — مستند متصل مثل ملاحظات آبل ---------- */
@@ -450,8 +522,8 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  gap: 7px;
-  padding: 12px 10px calc(var(--keyboard-inset, 0px) + 116px);
+  gap: 0;
+  padding: 12px 12px calc(var(--keyboard-inset, 0px) + 116px);
   scroll-padding-bottom: calc(var(--keyboard-inset, 0px) + 120px);
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.08) transparent;
@@ -475,20 +547,20 @@
   display: flex;
   align-items: flex-start;
   min-height: var(--rule-h);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.035);
+  border-radius: 0;
+  background: transparent;
+  border: 0;
   -webkit-user-select: text;
   user-select: text;
   transition: opacity var(--dur-fast);
 }
 
 .paper-line.is-task {
-  background: rgba(255, 255, 255, 0.065);
+  background: transparent;
 }
 
 .paper-line.sub {
-  background: rgba(255, 255, 255, 0.035);
+  background: transparent;
 }
 
 /* المهام: السحب الأفقي يزيح، والعمودي يمرر الصفحة */
@@ -611,7 +683,7 @@
   /* حجم نص ملاحظات آبل */
   font-size: 16.5px;
   line-height: 1.45;
-  padding: 8px 12px;
+  padding: 7px 4px;
   color: var(--label);
   caret-color: var(--checklist-accent);
   -webkit-tap-highlight-color: transparent;
@@ -652,18 +724,17 @@
 
 /* بداية الكتابة في صفحة فارغة */
 .paper-starter {
-  min-height: 130px;
+  min-height: 110px;
   text-align: start;
   color: var(--label-tertiary);
   font-size: 17px;
   line-height: 1.6;
-  padding: 18px;
+  padding: 16px 4px;
   cursor: text;
   width: 100%;
-  border-radius: 22px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
-  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 0;
+  background: transparent;
+  border: 0;
 }
 
 /* منطقة فارغة أسفل السطور — النقر يتابع الكتابة في نهاية المستند */

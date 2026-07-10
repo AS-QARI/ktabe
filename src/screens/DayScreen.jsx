@@ -110,6 +110,20 @@ function htmlToText(html) {
   return (div.textContent ?? '').replace(/\u200b/g, '');
 }
 
+function contentText(content) {
+  return contentToHtml(content)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function isEmptyContent(content) {
   return !content || content.replace(/<[^>]*>/g, '').replace(/&nbsp;|\u200b/g, '').trim() === '';
 }
@@ -241,6 +255,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [caretIntent, setCaretIntent] = useState('end'); // 'end' | 'start' | { offset }
   const [flip, setFlip] = useState('next');
   const [localPageMeta, setLocalPageMeta] = useState(() => readLocalPageMeta(dateKey));
+  const [activePageId, setActivePageId] = useState(null);
   const [draggingId, setDraggingId] = useState(null);
   const [dropTargetId, setDropTargetId] = useState(null);
   const [dropEdge, setDropEdge] = useState(null); // معرف جذر يُدرج قبله، أو 'end'
@@ -272,6 +287,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   useEffect(() => {
     setPages(null);
     setFocusedId(null);
+    setActivePageId(null);
     setSelectMode(false);
     setFormatMenuOpen(false);
     load();
@@ -319,8 +335,11 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     };
   }, [load]);
 
-  // نستخدم أول صفحة فقط — الصفحة قابلة للتمرير بلا حدود
-  const page = pages && pages.length > 0 ? pages[0] : null;
+  const sortedPages = useMemo(
+    () => [...(pages ?? [])].sort((a, b) => a.page_no - b.page_no),
+    [pages]
+  );
+  const page = sortedPages.find((p) => p.id === activePageId) ?? null;
   const blocks = useMemo(() => page?.blocks ?? [], [page]);
   const pageMeta = {
     ...localPageMeta,
@@ -351,15 +370,32 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   }, [blocks]);
 
   const focusedRow = rows.find((r) => r.block.id === focusedId) ?? null;
-  const taskRows = rows.filter((r) => r.block.kind === 'task');
-  const doneTaskRows = taskRows.filter((r) => r.block.is_completed);
-  const noteRows = rows.filter(
-    (r) => r.block.kind !== 'task' && !isEmptyContent(r.block.content)
+  const dayBlocks = useMemo(
+    () => sortedPages.flatMap((p) => p.blocks ?? []),
+    [sortedPages]
   );
-  const subtaskCount = rows.filter((r) => r.depth > 0).length;
+  const dayTasks = dayBlocks.filter((b) => b.kind === 'task');
+  const dayDoneTasks = dayTasks.filter((b) => b.is_completed);
   const dayProgress =
-    taskRows.length === 0 ? 0 : Math.round((doneTaskRows.length / taskRows.length) * 100);
-  const focusTask = taskRows.find((r) => !r.block.is_completed)?.block ?? null;
+    dayTasks.length === 0 ? 0 : Math.round((dayDoneTasks.length / dayTasks.length) * 100);
+  const noteCards = useMemo(
+    () =>
+      sortedPages.map((p) => {
+        const pageBlocks = [...(p.blocks ?? [])].sort((a, b) => a.position - b.position);
+        const firstText = pageBlocks.map((b) => contentText(b.content)).find(Boolean);
+        const taskCount = pageBlocks.filter((b) => b.kind === 'task').length;
+        const doneCount = pageBlocks.filter((b) => b.kind === 'task' && b.is_completed).length;
+        return {
+          page: p,
+          title: p.title?.trim() || `ملاحظة ${p.page_no}`,
+          preview: firstText || 'اضغط وافتح مساحة كتابة جديدة لهذه الملاحظة.',
+          lineCount: pageBlocks.length,
+          taskCount,
+          doneCount,
+        };
+      }),
+    [sortedPages]
+  );
   const dayRail = useMemo(
     () =>
       DAY_RAIL_OFFSETS.map((offset) => {
@@ -425,7 +461,24 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     const created = await createPage(dateKey, 1);
     const nextPage = { ...created, blocks: [] };
     setPages([nextPage]);
+    setActivePageId(nextPage.id);
     return nextPage;
+  };
+
+  const addNotePage = async () => {
+    markEdit();
+    try {
+      const nextNo =
+        sortedPages.length > 0 ? Math.max(...sortedPages.map((p) => p.page_no || 0)) + 1 : 1;
+      const created = await createPage(dateKey, nextNo);
+      const nextPage = { ...created, blocks: [] };
+      setPages((ps) => [...(ps ?? []), nextPage].sort((a, b) => a.page_no - b.page_no));
+      setActivePageId(nextPage.id);
+      setFocusedId(null);
+      setCaretIntent('end');
+    } catch {
+      load();
+    }
   };
 
   /** أول كتابة في يوم فارغ: ننشئ الصفحة (إن لزم) وسطرها الأول */
@@ -1038,30 +1091,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         </button>
       </div>
 
-      <section className="day-command-card" aria-label="نظرة اليوم">
-        <div className="day-command-head">
-          <div>
-            <span className="day-command-kicker">{relativeDayLabel(dateKey)}</span>
-            <h1>{formatWeekday(d)}</h1>
-            <p>{formatDateWithYear(d)}</p>
-          </div>
-          <div className="day-progress-orb" style={{ '--progress': `${dayProgress}%` }}>
-            <strong>{dayProgress}%</strong>
-            <span>إنجاز</span>
-          </div>
-        </div>
-
-        <div className="day-focus-strip">
-          <span>التركيز الآن</span>
-          <strong>
-            {focusTask
-              ? htmlToText(focusTask.content) || 'مهمة بلا نص'
-              : taskRows.length > 0
-                ? 'كل المهام منجزة'
-                : 'اكتب أول مهمة لهذا اليوم'}
-          </strong>
-        </div>
-
+      <section className="day-compact-nav" aria-label="التنقل اليومي">
         <div className="day-rail" aria-label="التنقل بين الأيام">
           {dayRail.map((item) => (
             <button
@@ -1082,48 +1112,53 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             </button>
           ))}
         </div>
-
-        <div className="day-metrics">
-          <span><strong>{doneTaskRows.length}/{taskRows.length}</strong> مهام</span>
-          <span><strong>{noteRows.length}</strong> ملاحظات</span>
-          <span><strong>{subtaskCount}</strong> فرعية</span>
+        <div className="day-progress-pill" style={{ '--progress': `${dayProgress}%` }}>
+          <strong>{dayProgress}%</strong>
+          <span>إنجاز</span>
         </div>
       </section>
 
       <div className="book">
         <div
-          key={`${dateKey}-${page?.id ?? 'blank'}`}
+          key={`${dateKey}-${page?.id ?? 'notes'}`}
           className={`paper flip-${flip}`}
         >
-          {/* رأس الورقة */}
-          <header className="paper-head">
-            <button
-              type="button"
-              className="page-turn"
-              aria-label="اليوم السابق"
-              onClick={() => goDay(-1)}
-            >
-              <ChevronRightIcon size={22} />
-            </button>
+          <header className={`paper-head${page ? ' note-open' : ''}`}>
+            {page && (
+              <button
+                type="button"
+                className="note-back"
+                aria-label="العودة للملاحظات"
+                onClick={() => {
+                  setActivePageId(null);
+                  setFocusedId(null);
+                  setFormatMenuOpen(false);
+                }}
+              >
+                ملاحظاتي
+              </button>
+            )}
             <div className="paper-date">
-              <span className="paper-weekday">صفحة اليوم</span>
-              <span className="paper-daynum">
-                {rows.length === 0 ? 'مساحة جاهزة للتخطيط' : `${rows.length} سطر في الصفحة`}
-              </span>
-              <input
-                className="day-title-input"
-                value={pageMeta.title ?? ''}
-                placeholder="عنوان اليوم"
-                onChange={(e) => savePagePatch({ title: e.target.value })}
-              />
+              <span className="paper-weekday">{relativeDayLabel(dateKey)} · {formatWeekday(d)}</span>
+              <span className="paper-daynum">{formatDateWithYear(d)}</span>
+              {page ? (
+                <input
+                  className="day-title-input"
+                  value={pageMeta.title ?? ''}
+                  placeholder="عنوان الملاحظة"
+                  onChange={(e) => savePagePatch({ title: e.target.value })}
+                />
+              ) : (
+                <h1 className="notes-title">ملاحظات اليوم</h1>
+              )}
             </div>
             <button
               type="button"
-              className="page-turn"
-              aria-label="اليوم التالي"
-              onClick={() => goDay(1)}
+              className="note-add-head"
+              aria-label="ملاحظة جديدة"
+              onClick={addNotePage}
             >
-              <ChevronLeftIcon size={22} />
+              +
             </button>
           </header>
 
@@ -1138,7 +1173,40 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             <div className="inline-loading"><div className="spinner" /></div>
           )}
 
-          {pages !== null && !error && (
+          {pages !== null && !error && !page && (
+            <section className="notes-list" aria-label="ملاحظات اليوم">
+              {noteCards.length === 0 ? (
+                <button type="button" className="empty-note-card" onClick={addNotePage}>
+                  <span>لا توجد ملاحظات بعد</span>
+                  <strong>ابدأ ملاحظة جديدة</strong>
+                  <p>اكتب فكرة، مهمة، أو صفحة كاملة لهذا اليوم.</p>
+                </button>
+	              ) : (
+	                noteCards.map((card) => (
+	                  <button
+	                    key={card.page.id}
+	                    type="button"
+	                    className="note-card"
+	                    onClick={() => {
+	                      setActivePageId(card.page.id);
+	                      setFocusedId(null);
+	                      setFormatMenuOpen(false);
+	                    }}
+	                  >
+	                    <span className="note-card-index">ملاحظة {card.page.page_no}</span>
+	                    <strong>{card.title}</strong>
+	                    <p>{card.preview}</p>
+	                    <span className="note-card-meta">
+	                      {card.lineCount || 'بدون'} سطر
+	                      {card.taskCount > 0 && ` · ${card.doneCount}/${card.taskCount} مهام`}
+	                    </span>
+	                  </button>
+	                ))
+	              )}
+            </section>
+          )}
+
+          {pages !== null && !error && page && (
             <div
               className={`paper-lines${selectMode ? ' select-mode' : ''}`}
               ref={paperLinesRef}

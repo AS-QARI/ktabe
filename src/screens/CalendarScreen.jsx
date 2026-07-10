@@ -4,12 +4,16 @@ import {
   setBlockCompleted,
   createCountdown,
   deleteCountdown,
+  createPage,
+  createBlock,
+  updateBlock,
 } from '../data/storage';
 import { useLiveData } from '../hooks/useLiveData';
 import {
   buildMonthGrid,
   weekdayNames,
   formatMonthYear,
+  formatFullDate,
   todayKey,
   relativeDayLabel,
   diffDaysBetweenKeys,
@@ -17,15 +21,16 @@ import {
 } from '../utils/dates';
 import { daysAr } from '../utils/format';
 import CountdownModal from '../components/countdowns/CountdownModal';
+import Modal from '../components/ui/Modal';
 import {
   GearIcon,
   PlusIcon,
   TrashIcon,
   CheckIcon,
-  NoteIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   HourglassIcon,
+  CalendarIcon,
 } from '../components/ui/Icons';
 import './screens.css';
 import './CalendarScreen.css';
@@ -65,26 +70,86 @@ function countdownText(diff) {
   return `مضى ${daysAr(-diff)}`;
 }
 
+/** نص المهمة للعرض خارج المحرر: بلا وسوم HTML ولا علامات ** القديمة */
+function plainContent(content) {
+  const text = (content ?? '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim();
+  if (text.startsWith('**') && text.endsWith('**') && text.length >= 5) {
+    return text.slice(2, -2);
+  }
+  return text;
+}
+
+/** "أمس" / "قبل يومين" / "قبل 5 أيام" — عمر المهمة المتأخرة */
+function overdueAgeLabel(dateKey, today) {
+  const n = diffDaysBetweenKeys(dateKey, today);
+  if (n === 1) return 'أمس';
+  return `قبل ${daysAr(n)}`;
+}
+
+/** عنوان مجموعة يوم قادم: "غداً" أو "الأحد، 12 يوليو" */
+function upcomingGroupLabel(dateKey, today) {
+  const diff = diffDaysBetweenKeys(today, dateKey);
+  if (diff === 1) return 'غداً';
+  return formatFullDate(parseDateKey(dateKey));
+}
+
+function taskCountLabel(count) {
+  if (count === 0) return '0 مهام';
+  if (count === 1) return 'مهمة واحدة';
+  if (count === 2) return 'مهمتان';
+  if (count <= 10) return `${count} مهام`;
+  return `${count} مهمة`;
+}
+
+/**
+ * شاشة التقويم — مركز المهام في شاشة واحدة ثابتة بلا تمرير:
+ * متأخرة (تُنقل لليوم بضغطة) / اليوم / قادمة، وشبكة الشهر
+ * والعدادات التنازلية خلف ضغطة في أوراق منزلقة.
+ */
 export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
   const live = useLiveData(exportAll, ALL_TABLES);
   const data = live.data;
+  const today = todayKey();
 
+  const [monthOpen, setMonthOpen] = useState(false);
+  const [countdownsOpen, setCountdownsOpen] = useState(false);
+  const [countdownModalOpen, setCountdownModalOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [taskSheet, setTaskSheet] = useState(null);
+  const [completedOpen, setCompletedOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [selectedKey, setSelectedKey] = useState(todayKey);
-  const [countdownModalOpen, setCountdownModalOpen] = useState(false);
 
-  const today = todayKey();
-  const cells = useMemo(() => buildMonthGrid(viewDate), [viewDate]);
+  /* ---------- تصنيف المهام: متأخرة / اليوم / قادمة ---------- */
 
-  /** المهام مفهرسة بتاريخ صفحتها — للنقاط تحت الأيام ولقائمة اليوم المحدد */
-  const { tasksByDay, writingDays } = useMemo(() => {
+  const {
+    overdue,
+    todayTasks,
+    upcomingGroups,
+    upcomingCount,
+    completedTasks,
+    tasksByDay,
+    writingDays,
+    openSubCount,
+  } = useMemo(() => {
     const pageDate = new Map((data?.pages ?? []).map((p) => [p.id, p.page_date]));
     const byDay = new Map();
+    const subCount = new Map();
+
     for (const b of data?.blocks ?? []) {
       if (b.kind !== 'task') continue;
+      if (b.parent_id) {
+        if (!b.is_completed) subCount.set(b.parent_id, (subCount.get(b.parent_id) ?? 0) + 1);
+        continue;
+      }
       const d = pageDate.get(b.page_id);
       if (!d) continue;
       if (!byDay.has(d)) byDay.set(d, []);
@@ -93,28 +158,75 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
     for (const list of byDay.values()) {
       list.sort((a, b) => a.position - b.position);
     }
+
+    const overdueList = [];
+    const todayList = [];
+    const upcoming = [];
+    const completed = [];
+    for (const d of [...byDay.keys()].sort()) {
+      for (const t of byDay.get(d)) {
+        if (t.is_completed) {
+          completed.push({ ...t, date: d });
+          continue;
+        }
+        if (d < today) {
+          overdueList.push({ ...t, date: d });
+        } else if (d === today) {
+          todayList.push({ ...t, date: d });
+        } else {
+          upcoming.push({ ...t, date: d });
+        }
+      }
+    }
+    todayList.sort((a, b) => a.position - b.position);
+    completed.sort((a, b) => {
+      const aTime = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+      const bTime = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    const groups = [];
+    for (const t of upcoming) {
+      if (groups.at(-1)?.date !== t.date) groups.push({ date: t.date, items: [] });
+      groups.at(-1).items.push(t);
+    }
+
     return {
+      overdue: overdueList,
+      todayTasks: todayList,
+      upcomingGroups: groups,
+      upcomingCount: upcoming.length,
+      completedTasks: completed,
       tasksByDay: byDay,
       writingDays: new Set((data?.pages ?? []).map((p) => p.page_date)),
+      openSubCount: subCount,
     };
-  }, [data]);
+  }, [data, today]);
 
-  const selectedTasks = tasksByDay.get(selectedKey) ?? [];
-  const selectedDone = selectedTasks.filter((t) => t.is_completed).length;
-  const selectedProgress =
-    selectedTasks.length === 0 ? 0 : Math.round((selectedDone / selectedTasks.length) * 100);
+  const upcomingTasks = upcomingGroups.flatMap((group) =>
+    group.items.map((task) => ({ ...task, date: group.date }))
+  );
+  const sheetTasks =
+    taskSheet?.type === 'overdue'
+      ? overdue
+      : taskSheet?.type === 'today'
+        ? todayTasks
+        : taskSheet?.type === 'upcoming'
+          ? upcomingTasks
+          : [];
+
+  /* ---------- العدادات التنازلية ---------- */
 
   const countdowns = useMemo(() => {
-    const todayValue = todayKey();
     return [...(data?.countdowns ?? [])]
-      .map((countdown) => ({ ...countdown, meta: countdownMeta(countdown, todayValue) }))
+      .map((c) => ({ ...c, meta: countdownMeta(c, today) }))
       .sort((a, b) => {
         const aRank = a.meta.diff >= 0 ? 0 : 1;
         const bRank = b.meta.diff >= 0 ? 0 : 1;
         if (aRank !== bRank) return aRank - bRank;
         return Math.abs(a.meta.diff) - Math.abs(b.meta.diff);
       });
-  }, [data?.countdowns]);
+  }, [data?.countdowns, today]);
 
   const countdownsByDay = useMemo(() => {
     const byDay = new Map();
@@ -125,26 +237,11 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
     return byDay;
   }, [countdowns]);
 
-  const spotlightCountdown = countdowns[0] ?? null;
-  const futureCountdowns = countdowns.filter((c) => c.meta.diff >= 0).length;
-  const todayTasks = tasksByDay.get(today)?.length ?? 0;
-  const selectedCountdowns = countdownsByDay.get(selectedKey) ?? [];
-  const isCurrentMonth =
-    viewDate.getFullYear() === new Date().getFullYear() &&
-    viewDate.getMonth() === new Date().getMonth();
+  const nearestCountdown = countdowns.find((c) => c.meta.diff >= 0) ?? null;
 
-  const moveMonth = (delta) => {
-    navigator.vibrate?.(5);
-    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1));
-  };
+  /* ---------- الإجراءات ---------- */
 
-  const goToday = () => {
-    const now = new Date();
-    setViewDate(new Date(now.getFullYear(), now.getMonth(), 1));
-    setSelectedKey(today);
-  };
-
-  /** إكمال مهمة من قائمة اليوم — تحديث متفائل */
+  /** إكمال/إلغاء إكمال مهمة — تحديث متفائل */
   const toggleBlock = (block) => {
     navigator.vibrate?.(10);
     const done = !block.is_completed;
@@ -159,6 +256,57 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
     setBlockCompleted(block.id, done).catch(() => live.reload());
   };
 
+  /** صفحة يوم محدد — الأولى إن تعددت، وتُنشأ إن لم توجد */
+  const ensurePageFor = async (dateKey) => {
+    const existing = (data?.pages ?? [])
+      .filter((p) => p.page_date === dateKey)
+      .sort((a, b) => (a.page_no ?? 1) - (b.page_no ?? 1))[0];
+    if (existing) return existing;
+    return createPage(dateKey, 1);
+  };
+
+  /** آخر موضع جذري في صفحة + 1 — للإلحاق في نهاية اليوم */
+  const nextRootPosition = (pageId, blocks) => {
+    const roots = blocks.filter((b) => b.page_id === pageId && !b.parent_id);
+    return roots.length ? Math.max(...roots.map((b) => b.position || 0)) + 1 : 1;
+  };
+
+  /**
+   * نقل مهمة متأخرة إلى صفحة اليوم (سلوك «أعد جدولتها لليوم»
+   * في Todoist وAny.do): تنتقل بأبنائها لنهاية صفحة اليوم.
+   */
+  const moveTaskToToday = async (task) => {
+    navigator.vibrate?.(12);
+    try {
+      const page = await ensurePageFor(today);
+      const position = nextRootPosition(page.id, data?.blocks ?? []);
+      live.setData((d) => ({
+        ...d,
+        pages: d.pages.some((p) => p.id === page.id) ? d.pages : [...d.pages, page],
+        blocks: d.blocks.map((b) => {
+          if (b.id === task.id) return { ...b, page_id: page.id, parent_id: null, position };
+          if (b.parent_id === task.id) return { ...b, page_id: page.id };
+          return b;
+        }),
+      }));
+      await updateBlock(task.id, { page_id: page.id, parent_id: null, position });
+      const children = (data?.blocks ?? []).filter((b) => b.parent_id === task.id);
+      await Promise.all(
+        children.map((c) => updateBlock(c.id, { page_id: page.id }))
+      );
+    } catch {
+      live.reload();
+    }
+  };
+
+  /** إضافة مهمة جديدة على يوم محدد (اليوم/غداً/أي تاريخ) */
+  const addTask = async (dateKey, text) => {
+    const page = await ensurePageFor(dateKey);
+    const position = nextRootPosition(page.id, data?.blocks ?? []);
+    await createBlock({ page_id: page.id, kind: 'task', content: text, position });
+    await live.reload();
+  };
+
   const saveCountdown = async (fields) => {
     await createCountdown(fields);
     setCountdownModalOpen(false);
@@ -171,21 +319,59 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
     await live.reload();
   };
 
+  const openDayAt = (dateKey) => {
+    setMonthOpen(false);
+    setTaskSheet(null);
+    setCompletedOpen(false);
+    setCountdownsOpen(false);
+    onOpenDay(dateKey);
+  };
+
+  const moveMonth = (delta) => {
+    navigator.vibrate?.(5);
+    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1));
+  };
+
+  const isCurrentMonth =
+    viewDate.getFullYear() === new Date().getFullYear() &&
+    viewDate.getMonth() === new Date().getMonth();
+
+  const cells = useMemo(() => buildMonthGrid(viewDate), [viewDate]);
+
+  /* ---------- العرض ---------- */
+
   return (
     <main className="screen calendar-screen">
-      <header className="screen-header">
+      <header className="cal-head">
         <div>
           <h1>التقويم</h1>
-          <p className="screen-subtitle">نظرة شهرية، مهام اليوم، وعدّاداتك المهمة.</p>
+          <p>اليوم وما حوله في نظرة واحدة</p>
         </div>
         <div className="calendar-header-actions">
           <button
             type="button"
-            className="icon-btn filled"
-            aria-label="عداد جديد"
-            onClick={() => setCountdownModalOpen(true)}
+            className="cal-completed-btn"
+            aria-label="المهام المكتملة"
+            onClick={() => setCompletedOpen(true)}
+          >
+            <CheckIcon size={15} />
+            <span>{completedTasks.length}</span>
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="مهمة جديدة"
+            onClick={() => setComposerOpen(true)}
           >
             <PlusIcon size={22} />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="تقويم الشهر"
+            onClick={() => setMonthOpen(true)}
+          >
+            <CalendarIcon size={22} />
           </button>
           <button
             type="button"
@@ -198,18 +384,202 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
         </div>
       </header>
 
-      <CountdownSpotlight
-        countdown={spotlightCountdown}
-        onCreate={() => setCountdownModalOpen(true)}
-      />
+      {live.error && (
+        <div className="error-banner">
+          <span>تعذّر التحميل</span>
+          <button type="button" onClick={live.reload}>أعد المحاولة</button>
+        </div>
+      )}
 
-      <div className="calendar-insights" aria-label="ملخص سريع">
-        <InsightPill label="مهام اليوم" value={todayTasks} />
-        <InsightPill label="اليوم المحدد" value={`${selectedDone}/${selectedTasks.length}`} />
-        <InsightPill label="عدادات قادمة" value={futureCountdowns} />
+      <div className="calendar-dashboard">
+        {data === null && !live.error && (
+          <div className="inline-loading"><div className="spinner" /></div>
+        )}
+
+        {data !== null && (
+          <>
+            <button
+              type="button"
+              className={`countdown-hero${nearestCountdown ? ` ${nearestCountdown.meta.state}` : ' empty'}`}
+              onClick={() => nearestCountdown ? setCountdownsOpen(true) : setCountdownModalOpen(true)}
+            >
+              <span className="countdown-hero-icon">
+                <HourglassIcon size={20} />
+              </span>
+              {nearestCountdown ? (
+                <>
+                  <span className="countdown-hero-copy">
+                    <strong>{nearestCountdown.title}</strong>
+                    <small>{formatFullDate(parseDateKey(nearestCountdown.target_date))}</small>
+                  </span>
+                  <span className="countdown-hero-days">
+                    {nearestCountdown.meta.diff === 0 ? (
+                      <strong>اليوم</strong>
+                    ) : (
+                      <>
+                        <strong>{Math.abs(nearestCountdown.meta.diff)}</strong>
+                        <small>{countdownText(nearestCountdown.meta.diff)}</small>
+                      </>
+                    )}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="countdown-hero-copy">
+                    <strong>لا يوجد عداد قريب</strong>
+                    <small>أضف موعداً مهماً ليظهر هنا</small>
+                  </span>
+                  <span className="countdown-hero-add">إضافة</span>
+                </>
+              )}
+            </button>
+
+            <div className="task-snapshot" aria-label="ملخص المهام">
+              <TaskPreviewSection
+                tone="late"
+                title="متأخرة"
+                count={overdue.length}
+                tasks={overdue.slice(0, 2)}
+                empty="لا توجد مهام متأخرة"
+                onMore={() => setTaskSheet({ type: 'overdue', title: 'المهام المتأخرة' })}
+              >
+                {(task) => (
+                  <TaskPreviewRow
+                    key={task.id}
+                    task={task}
+                    meta={overdueAgeLabel(task.date, today)}
+                    subCount={openSubCount.get(task.id) ?? 0}
+                    onToggle={() => toggleBlock(task)}
+                    onOpen={() => openDayAt(task.date)}
+                    action={
+                      <button
+                        type="button"
+                        className="task-row-action"
+                        onClick={() => moveTaskToToday(task)}
+                      >
+                        اليوم
+                      </button>
+                    }
+                  />
+                )}
+              </TaskPreviewSection>
+
+              <TaskPreviewSection
+                tone="today"
+                title="مهام اليوم"
+                count={todayTasks.length}
+                tasks={todayTasks.slice(0, 2)}
+                empty="لا مهام مفتوحة اليوم"
+                onMore={() => setTaskSheet({ type: 'today', title: 'مهام اليوم' })}
+              >
+                {(task) => (
+                  <TaskPreviewRow
+                    key={task.id}
+                    task={task}
+                    subCount={openSubCount.get(task.id) ?? 0}
+                    onToggle={() => toggleBlock(task)}
+                    onOpen={() => openDayAt(today)}
+                  />
+                )}
+              </TaskPreviewSection>
+
+              <TaskPreviewSection
+                tone="next"
+                title="قادمة"
+                count={upcomingCount}
+                tasks={upcomingTasks.slice(0, 2)}
+                empty="لا مهام قادمة"
+                onMore={() => setTaskSheet({ type: 'upcoming', title: 'المهام القادمة' })}
+              >
+                {(task) => (
+                  <TaskPreviewRow
+                    key={task.id}
+                    task={task}
+                    meta={upcomingGroupLabel(task.date, today)}
+                    subCount={openSubCount.get(task.id) ?? 0}
+                    onToggle={() => toggleBlock(task)}
+                    onOpen={() => openDayAt(task.date)}
+                  />
+                )}
+              </TaskPreviewSection>
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="calendar-card">
+      <Modal
+        open={Boolean(taskSheet)}
+        onClose={() => setTaskSheet(null)}
+        title={taskSheet?.title ?? 'المهام'}
+        tall
+      >
+        {sheetTasks.length === 0 ? (
+          <div className="empty-state">
+            <CheckIcon size={38} />
+            <p>لا توجد مهام هنا حالياً</p>
+          </div>
+        ) : (
+          <div className="task-sheet-list">
+            {sheetTasks.map((task) => (
+              <TaskPreviewRow
+                key={task.id}
+                task={task}
+                meta={
+                  taskSheet?.type === 'overdue'
+                    ? overdueAgeLabel(task.date, today)
+                    : taskSheet?.type === 'upcoming'
+                      ? upcomingGroupLabel(task.date, today)
+                      : undefined
+                }
+                subCount={openSubCount.get(task.id) ?? 0}
+                onToggle={() => toggleBlock(task)}
+                onOpen={() => openDayAt(task.date)}
+                action={
+                  taskSheet?.type === 'overdue' ? (
+                    <button
+                      type="button"
+                      className="task-row-action"
+                      onClick={() => moveTaskToToday(task)}
+                    >
+                      اليوم
+                    </button>
+                  ) : null
+                }
+              />
+            ))}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={completedOpen}
+        onClose={() => setCompletedOpen(false)}
+        title="المهام المكتملة"
+        tall
+      >
+        {completedTasks.length === 0 ? (
+          <div className="empty-state">
+            <CheckIcon size={38} />
+            <p>لم تُكمل أي مهمة بعد</p>
+          </div>
+        ) : (
+          <div className="task-sheet-list">
+            {completedTasks.map((task) => (
+              <TaskPreviewRow
+                key={task.id}
+                task={task}
+                meta={relativeDayLabel(task.date)}
+                subCount={openSubCount.get(task.id) ?? 0}
+                onToggle={() => toggleBlock(task)}
+                onOpen={() => openDayAt(task.date)}
+              />
+            ))}
+          </div>
+        )}
+      </Modal>
+
+      {/* ورقة تقويم الشهر — تظهر عند الطلب فقط */}
+      <Modal open={monthOpen} onClose={() => setMonthOpen(false)} title="التقويم">
         <div className="calendar-nav">
           {/* في واجهة RTL: "السابق" يتجه يميناً و"التالي" يساراً */}
           <button
@@ -223,7 +593,14 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
           <div className="calendar-title">
             <h2>{formatMonthYear(viewDate)}</h2>
             {!isCurrentMonth && (
-              <button type="button" className="btn-text calendar-today-btn" onClick={goToday}>
+              <button
+                type="button"
+                className="btn-text calendar-today-btn"
+                onClick={() => {
+                  const now = new Date();
+                  setViewDate(new Date(now.getFullYear(), now.getMonth(), 1));
+                }}
+              >
                 اليوم
               </button>
             )}
@@ -249,28 +626,26 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
               <button
                 key={cell.key}
                 type="button"
-	                className={[
-	                  'calendar-day',
-	                  cell.key === today ? 'today' : '',
-	                  cell.key === selectedKey ? 'selected' : '',
-	                  tasksByDay.has(cell.key) ? 'has-tasks' : '',
-	                  countdownsByDay.has(cell.key) ? 'has-countdown' : '',
-	                ].join(' ')}
+                className={[
+                  'calendar-day',
+                  cell.key === today ? 'today' : '',
+                  tasksByDay.has(cell.key) ? 'has-tasks' : '',
+                  countdownsByDay.has(cell.key) ? 'has-countdown' : '',
+                ].join(' ')}
                 aria-label={relativeDayLabel(cell.key)}
-                onClick={() => setSelectedKey(cell.key)}
+                onClick={() => openDayAt(cell.key)}
               >
-	                <span className="calendar-day-num">{cell.day}</span>
-	                <span className="calendar-dots">
-	                  {countdownsByDay.has(cell.key) && (
-	                    <span className="calendar-dot countdown" />
-	                  )}
-	                  {(tasksByDay.get(cell.key) ?? []).slice(0, 3).map((t) => (
+                <span className="calendar-day-num">{cell.day}</span>
+                <span className="calendar-dots">
+                  {countdownsByDay.has(cell.key) && (
+                    <span className="calendar-dot countdown" />
+                  )}
+                  {(tasksByDay.get(cell.key) ?? []).slice(0, 3).map((t) => (
                     <span
                       key={t.id}
                       className={`calendar-dot${t.is_completed ? ' done' : ''}`}
                     />
                   ))}
-                  {/* يوم فيه كتابة بلا مهام: نقطة رمادية واحدة */}
                   {!tasksByDay.has(cell.key) && writingDays.has(cell.key) && (
                     <span className="calendar-dot writing" />
                   )}
@@ -279,238 +654,210 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
             )
           )}
         </div>
-      </div>
+        <p className="calendar-sheet-hint">اضغط على أي يوم لفتح صفحته</p>
+      </Modal>
 
-      {live.error && (
-        <div className="error-banner">
-          <span>تعذّر التحميل</span>
-          <button type="button" onClick={live.reload}>أعد المحاولة</button>
-        </div>
-      )}
-
-      <div className="section-header calendar-section-title">
-        <div>
-          <h2>{relativeDayLabel(selectedKey)}</h2>
-          <p>{formatSelectedDate(selectedKey)}</p>
-        </div>
-        <button
-          type="button"
-          className="btn-text open-day-btn"
-          onClick={() => onOpenDay(selectedKey)}
-        >
-          <NoteIcon size={18} />
-          فتح الصفحة
-        </button>
-      </div>
-
-      <SelectedDayCard
-        tasks={selectedTasks}
-        countdowns={selectedCountdowns}
-        writingDays={writingDays}
-        selectedKey={selectedKey}
-        selectedDone={selectedDone}
-        selectedProgress={selectedProgress}
-        onOpenDay={onOpenDay}
-        onToggleTask={toggleBlock}
-      />
-
-      <div className="section-header calendar-section-title">
-        <div>
-          <h2>العدادات التنازلية</h2>
-          <p>مرتبة حسب الأقرب، مثل لوحة انتظار صغيرة.</p>
-        </div>
-      </div>
-
-      {data?.countdowns?.length === 0 ? (
-        <div className="empty-state calendar-empty-countdowns">
-          <HourglassIcon size={40} />
-          <p>أضف مناسباتك المهمة وتابع كم يوماً يفصلك عنها</p>
-        </div>
-      ) : (
-        <div className="countdown-grid">
-          {countdowns.map((c) => (
-            <CountdownCard key={c.id} countdown={c} onDelete={removeCountdown} />
-          ))}
-        </div>
-      )}
+      {/* ورقة العدادات التنازلية */}
+      <Modal
+        open={countdownsOpen}
+        onClose={() => setCountdownsOpen(false)}
+        title="العدادات التنازلية"
+        headerAction={
+          <button
+            type="button"
+            className="btn-text"
+            onClick={() => setCountdownModalOpen(true)}
+          >
+            <PlusIcon size={18} /> جديد
+          </button>
+        }
+      >
+        {countdowns.length === 0 ? (
+          <div className="empty-state calendar-empty-countdowns">
+            <HourglassIcon size={40} />
+            <p>أضف مناسباتك المهمة وتابع كم يوماً يفصلك عنها</p>
+          </div>
+        ) : (
+          <div className="countdown-grid">
+            {countdowns.map((c) => (
+              <CountdownCard key={c.id} countdown={c} onDelete={removeCountdown} />
+            ))}
+          </div>
+        )}
+      </Modal>
 
       <CountdownModal
         open={countdownModalOpen}
         onClose={() => setCountdownModalOpen(false)}
         onSave={saveCountdown}
       />
+
+      <TaskComposer
+        open={composerOpen}
+        today={today}
+        onClose={() => setComposerOpen(false)}
+        onAdd={addTask}
+      />
     </main>
   );
 }
 
-function formatSelectedDate(key) {
-  return new Intl.DateTimeFormat('ar-u-ca-gregory-nu-latn', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(parseDateKey(key));
+function TaskPreviewSection({ tone, title, count, tasks, empty, onMore, children }) {
+  const hasMore = count > tasks.length;
+
+  return (
+    <section className={`task-preview task-preview-${tone}`}>
+      <div className="task-preview-head">
+        <div>
+          <h2>{title}</h2>
+          <span>{taskCountLabel(count)}</span>
+        </div>
+        {hasMore && (
+          <button type="button" className="task-preview-more" onClick={onMore}>
+            عرض المزيد
+          </button>
+        )}
+      </div>
+
+      <div className="task-preview-list">
+        {count === 0 ? (
+          <div className="task-preview-empty">{empty}</div>
+        ) : (
+          tasks.map((task) => children(task))
+        )}
+      </div>
+    </section>
+  );
 }
 
-function InsightPill({ label, value }) {
+function TaskPreviewRow({ task, subCount, meta, onToggle, onOpen, action }) {
   return (
-    <div className="calendar-insight-pill">
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className={`task-preview-row${task.is_completed ? ' done' : ''}`}>
+      <button
+        type="button"
+        className="task-preview-check"
+        role="checkbox"
+        aria-checked={task.is_completed}
+        aria-label={task.is_completed ? 'إلغاء الإكمال' : 'إكمال المهمة'}
+        onClick={onToggle}
+      >
+        <CheckIcon size={12} />
+      </button>
+      <button type="button" className="task-preview-text" onClick={onOpen}>
+        <span className="task-preview-title">{plainContent(task.content) || 'مهمة بلا نص'}</span>
+        {(meta || subCount > 0) && (
+          <span className="task-preview-meta">
+            {meta}
+            {meta && subCount > 0 ? ' · ' : ''}
+            {subCount > 0 ? `${subCount} فرعية` : ''}
+          </span>
+        )}
+      </button>
+      {action}
     </div>
   );
 }
 
-function CountdownSpotlight({ countdown, onCreate }) {
-  if (!countdown) {
-    return (
-      <section className="countdown-spotlight empty">
-        <div>
-          <span className="spotlight-kicker">واجهة العد التنازلي</span>
-          <h2>اختر تاريخاً مهمّاً ودع الصفحة تذكّرك كم باقي.</h2>
-          <p>مناسبات، اختبارات، سفر، أو أي هدف يحتاج عينك عليه كل يوم.</p>
-        </div>
-        <button type="button" className="spotlight-action" onClick={onCreate}>
-          <PlusIcon size={18} />
-          عداد جديد
-        </button>
-      </section>
-    );
-  }
+/** نافذة إضافة مهمة بتاريخ: اليوم / غداً / تاريخ آخر */
+function TaskComposer({ open, today, onClose, onAdd }) {
+  const [text, setText] = useState('');
+  const [choice, setChoice] = useState('today'); // today | tomorrow | custom
+  const [customDate, setCustomDate] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const { diff, state, progress } = countdown.meta;
-  const dateLabel = new Intl.DateTimeFormat('ar-u-ca-gregory-nu-latn', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(parseDateKey(countdown.target_date));
+  const tomorrow = useMemo(() => {
+    const d = parseDateKey(today);
+    d.setDate(d.getDate() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, [today]);
 
-  return (
-    <section className={`countdown-spotlight ${state}`}>
-      <div className="spotlight-orbit" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
-      <div className="spotlight-content">
-        <span className="spotlight-kicker">أقرب عدّاد</span>
-        <h2>{countdown.title}</h2>
-        <p>{dateLabel}</p>
-      </div>
-      <div className="spotlight-number" aria-label={countdownText(diff)}>
-        {diff > 0 ? (
-          <>
-            <strong>{diff}</strong>
-            <span>{countdownText(diff)}</span>
-          </>
-        ) : diff < 0 ? (
-          <>
-            <strong>{Math.abs(diff)}</strong>
-            <span>أيام مضت</span>
-          </>
-        ) : (
-          <strong className="spotlight-state-text">اليوم</strong>
-        )}
-      </div>
-      <div className="spotlight-progress" aria-hidden="true">
-        <span style={{ inlineSize: `${progress}%` }} />
-      </div>
-    </section>
-  );
-}
+  const dateKey = choice === 'today' ? today : choice === 'tomorrow' ? tomorrow : customDate;
+  const canSave = text.trim().length > 0 && Boolean(dateKey) && !busy;
 
-function SelectedDayCard({
-  tasks,
-  countdowns,
-  writingDays,
-  selectedKey,
-  selectedDone,
-  selectedProgress,
-  onOpenDay,
-  onToggleTask,
-}) {
-  const hasWriting = writingDays.has(selectedKey);
-  const previewTasks = tasks.slice(0, 3);
+  const reset = () => {
+    setText('');
+    setChoice('today');
+    setCustomDate('');
+    setBusy(false);
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!canSave) return;
+    setBusy(true);
+    try {
+      await onAdd(dateKey, text.trim());
+      reset();
+      onClose();
+    } catch {
+      setBusy(false);
+    }
+  };
 
   return (
-    <section className="selected-day-card">
-      <div className="selected-day-summary">
-        <div className="selected-ring" style={{ '--progress': `${selectedProgress}%` }}>
-          <span>{selectedProgress}%</span>
+    <Modal open={open} onClose={() => { reset(); onClose(); }} title="مهمة جديدة">
+      <form onSubmit={submit}>
+        <div className="field">
+          <label className="field-label" htmlFor="task-text">المهمة</label>
+          <input
+            id="task-text"
+            className="form-input"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="ماذا تريد أن تنجز؟"
+            maxLength={500}
+            autoFocus
+          />
         </div>
-        <div>
-          <h3>
-            {tasks.length > 0
-              ? `${selectedDone} من ${tasks.length} منجزة`
-              : hasWriting
-                ? 'فيه كتابة بدون مهام'
-                : 'يوم جديد وفاضي'}
-          </h3>
-          <p>
-            {tasks.length > 0
-              ? 'اضغط على أي مهمة لإكمالها سريعاً أو افتح الصفحة للتفاصيل.'
-              : hasWriting
-                ? 'افتح الصفحة وحوّل الأسطر المهمة إلى مهام عند الحاجة.'
-                : 'افتح الصفحة وابدأ تخطيط اليوم من الدفتر.'}
-          </p>
-        </div>
-      </div>
 
-      {countdowns.length > 0 && (
-        <div className="selected-countdowns">
-          {countdowns.map((c) => (
-            <span key={c.id}>
-              <HourglassIcon size={14} />
-              {c.title}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {previewTasks.length > 0 ? (
-        <div className="selected-task-preview">
-          {previewTasks.map((t) => (
-            <div key={t.id} className={`cal-task-row${t.is_completed ? ' done' : ''}`}>
-              <button
-                type="button"
-                className="cal-task-circle"
-                role="checkbox"
-                aria-checked={t.is_completed}
-                aria-label={t.is_completed ? 'إلغاء الإكمال' : 'إكمال المهمة'}
-                onClick={() => onToggleTask(t)}
-              >
-                <CheckIcon size={12} />
-              </button>
-              <button
-                type="button"
-                className="cal-task-text"
-                onClick={() => onOpenDay(selectedKey)}
-              >
-                {t.content || 'مهمة بلا نص'}
-              </button>
-            </div>
-          ))}
-          {tasks.length > previewTasks.length && (
+        <div className="field">
+          <span className="field-label">اليوم المستهدف</span>
+          <div className="composer-days" role="radiogroup" aria-label="اليوم المستهدف">
             <button
               type="button"
-              className="selected-more"
-              onClick={() => onOpenDay(selectedKey)}
+              role="radio"
+              aria-checked={choice === 'today'}
+              className={`composer-day${choice === 'today' ? ' active' : ''}`}
+              onClick={() => setChoice('today')}
             >
-              عرض {tasks.length - previewTasks.length} مهام إضافية
+              اليوم
             </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={choice === 'tomorrow'}
+              className={`composer-day${choice === 'tomorrow' ? ' active' : ''}`}
+              onClick={() => setChoice('tomorrow')}
+            >
+              غداً
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={choice === 'custom'}
+              className={`composer-day${choice === 'custom' ? ' active' : ''}`}
+              onClick={() => setChoice('custom')}
+            >
+              <CalendarIcon size={16} />
+              تاريخ آخر
+            </button>
+          </div>
+          {choice === 'custom' && (
+            <input
+              type="date"
+              className="form-input"
+              aria-label="اختر التاريخ"
+              value={customDate}
+              onChange={(e) => setCustomDate(e.target.value)}
+            />
           )}
         </div>
-      ) : (
-        <button
-          type="button"
-          className="selected-empty-action"
-          onClick={() => onOpenDay(selectedKey)}
-        >
-          <NoteIcon size={18} />
-          افتح صفحة هذا اليوم
+
+        <button type="submit" className="btn-primary" disabled={!canSave}>
+          إضافة المهمة
         </button>
-      )}
-    </section>
+      </form>
+    </Modal>
   );
 }
 

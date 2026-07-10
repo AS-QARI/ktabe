@@ -80,6 +80,10 @@ textarea {
   display: none;
 }
 
+.device-preview-app .tab-panel {
+  height: 100%;
+}
+
 .device-preview-app .day-screen {
   min-height: 0;
   height: calc(100% - var(--tabbar-height) - var(--safe-bottom) - 34px);

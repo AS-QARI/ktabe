@@ -24,6 +24,13 @@ function unwrap({ data, error }) {
   return data;
 }
 
+function dayRange(dateKey) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const start = new Date(y, m - 1, d);
+  const end = new Date(y, m - 1, d + 1);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 /* ---------------------------------------------------------------------
    1. Ø±Ù…Ø² Ø§Ù„Ø¯Ø®ÙˆÙ„ (PIN)
    Ø§Ù„ØªØ­Ù‚Ù‚ ÙŠØªÙ… Ø¯Ø§Ø®Ù„ Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø¹Ø¨Ø± Ø¯ÙˆØ§Ù„ RPC â€” Ø§Ù„Ù€ hash Ù„Ø§ ÙŠØµÙ„
@@ -108,6 +115,20 @@ export async function setBlockCompleted(id, done) {
     is_completed: done,
     completed_at: done ? new Date().toISOString() : null,
   });
+}
+
+export async function listCompletedTasksForDay(dateKey) {
+  const { start, end } = dayRange(dateKey);
+  return unwrap(
+    await supabase
+      .from('blocks')
+      .select('*, pages(id, page_date, page_no, title)')
+      .eq('kind', 'task')
+      .eq('is_completed', true)
+      .gte('completed_at', start)
+      .lt('completed_at', end)
+      .order('completed_at', { ascending: false })
+  );
 }
 
 export async function deleteBlock(id) {
@@ -219,4 +240,3 @@ export function onTablesChange(tables, onChange) {
     supabase.removeChannel(channel);
   };
 }
-
