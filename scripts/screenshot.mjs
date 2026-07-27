@@ -12,7 +12,7 @@ import { join } from 'node:path';
 const CHROME =
   process.env.CHROME_PATH ??
   'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const BASE_URL = 'http://127.0.0.1:5173';
+const BASE_URL = process.env.BASE_URL ?? 'http://127.0.0.1:5173';
 const OUT_DIR = process.argv[2] ?? 'screenshots';
 const TABS = ['day', 'calendar', 'summary'];
 
@@ -66,4 +66,3 @@ if (errors.length) {
 } else {
   console.log('\nno console errors ✓');
 }
-

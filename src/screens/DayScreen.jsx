@@ -37,6 +37,7 @@ import {
   SelectIcon,
   CopyIcon,
   XIcon,
+  PinIcon,
 } from '../components/ui/Icons';
 import './screens.css';
 import './DayScreen.css';
@@ -53,6 +54,34 @@ const noteTimeFmt = new Intl.DateTimeFormat('ar-u-ca-gregory-nu-latn', {
   day: 'numeric',
   month: 'short',
 });
+const noteStampFmt = new Intl.DateTimeFormat('ar-u-ca-gregory-nu-latn', {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** يصوغ ختم زمني من قيمة تاريخ (ISO أو رقم) — فارغ إن غابت */
+function formatStamp(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : noteStampFmt.format(d);
+}
+
+/* نسخة محلية احتياطية للملاحظات المثبّتة، للمزامنة القديمة أو عند انقطاع الشبكة. */
+const PINNED_KEY = 'kitabi-pinned-notes';
+
+function readPinnedIds() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(PINNED_KEY)) ?? []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writePinnedIds(ids) {
+  localStorage.setItem(PINNED_KEY, JSON.stringify([...ids]));
+}
 
 /* أنماط النص — تقابل قائمة الأنماط في لوحة تنسيق ملاحظات آبل */
 const TEXT_STYLES = [
@@ -253,24 +282,31 @@ function isBold(content) {
 
 /**
  * عنوان ومعاينة بطاقة الملاحظة — مثل تطبيق ملاحظات آبل:
- * العنوان الصريح إن وُجد، وإلا أول سطر مكتوب من داخل الملاحظة،
- * والمعاينة هي السطر التالي غير المستهلك في العنوان.
+ * العنوان هو أول سطر مكتوب من داخل الملاحظة في موضعه الحقيقي،
+ * ثم نلجأ للعنوان المحفوظ فقط إن كانت الملاحظة بلا نص. المعاينة هي
+ * السطر التالي غير المستهلك في العنوان.
  */
 function noteCardMeta(p, localTitle = '') {
-  const pageBlocks = [...(p.blocks ?? [])].sort((a, b) => a.position - b.position);
-  const texts = pageBlocks.map((b) => contentText(b.content)).filter(Boolean);
-  const explicit = p.title?.trim() || localTitle.trim();
-  const derived = texts[0]
-    ? texts[0].length > 56
-      ? `${texts[0].slice(0, 56)}…`
-      : texts[0]
+  const allBlocks = p.blocks ?? [];
+  // العنوان والمعاينة من السطور الرئيسية بترتيبها الحقيقي فقط — لا نخلط
+  // السطور الفرعية (المعشّشة) لأن مواضعها تتداخل مع الجذور فتُفسد الترتيب.
+  const rootTexts = allBlocks
+    .filter((b) => !b.parent_id)
+    .sort((a, b) => a.position - b.position)
+    .map((b) => contentText(b.content))
+    .filter(Boolean);
+  const fallbackTitle = p.title?.trim() || localTitle.trim();
+  const derived = rootTexts[0]
+    ? rootTexts[0].length > 56
+      ? `${rootTexts[0].slice(0, 56)}…`
+      : rootTexts[0]
     : null;
   return {
-    title: explicit || derived || `ملاحظة ${p.page_no}`,
-    preview: (explicit ? texts[0] : texts[1]) || '',
-    lineCount: pageBlocks.length,
-    taskCount: pageBlocks.filter((b) => b.kind === 'task').length,
-    doneCount: pageBlocks.filter((b) => b.kind === 'task' && b.is_completed).length,
+    title: derived || fallbackTitle || `ملاحظة ${p.page_no}`,
+    preview: (derived ? rootTexts[1] : rootTexts[0]) || '',
+    lineCount: allBlocks.length,
+    taskCount: allBlocks.filter((b) => b.kind === 'task').length,
+    doneCount: allBlocks.filter((b) => b.kind === 'task' && b.is_completed).length,
   };
 }
 
@@ -293,6 +329,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [activePageId, setActivePageId] = useState(null);
   const [pendingOpenPageId, setPendingOpenPageId] = useState(null);
   const [notesScope, setNotesScope] = useState('day');
+  const [pinnedIds, setPinnedIds] = useState(() => readPinnedIds());
   const [draggingId, setDraggingId] = useState(null);
   const [dragGhost, setDragGhost] = useState(null); // بطاقة الشبح التي تتبع الإصبع
   const [dropSlot, setDropSlot] = useState(null); // فتحة الإفلات: خط إدراج أو تعشيش
@@ -439,30 +476,50 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const dayDoneTasks = dayTasks.filter((b) => b.is_completed);
   const dayProgress =
     dayTasks.length === 0 ? 0 : Math.round((dayDoneTasks.length / dayTasks.length) * 100);
+  const isPagePinned = (p) => Boolean(p.is_pinned || pinnedIds.has(p.id));
+  // المثبّتة أولاً، والأحدث تثبيتاً أولاً داخلها، ثم بقية الترتيب.
+  const pinnedFirst = (a, b) => {
+    const pinGroup = Number(b.pinned) - Number(a.pinned);
+    if (pinGroup !== 0) return pinGroup;
+    if (!a.pinned) return 0;
+    return new Date(b.pinnedAt ?? 0) - new Date(a.pinnedAt ?? 0);
+  };
   const noteCards = useMemo(
     () =>
-      sortedPages.map((p) => {
-        const meta = noteCardMeta(p, readLocalPageMeta(p.id).title);
-        return {
-          page: p,
-          ...meta,
-          preview: meta.preview || 'اضغط وافتح مساحة كتابة جديدة لهذه الملاحظة.',
-        };
-      }),
-    [sortedPages]
+      sortedPages
+        .map((p) => {
+          const meta = noteCardMeta(p, readLocalPageMeta(p.id).title);
+          return {
+            page: p,
+            ...meta,
+            preview: meta.preview || 'اضغط وافتح مساحة كتابة جديدة لهذه الملاحظة.',
+            pinned: isPagePinned(p),
+            pinnedAt: p.pinned_at,
+            createdLabel: formatStamp(p.created_at),
+            editedLabel: formatStamp(noteUpdatedAt(p)),
+          };
+        })
+        .sort(pinnedFirst),
+    [sortedPages, pinnedIds]
   );
   const allNoteCards = useMemo(
     () =>
-      sortedAllPages.map((p) => {
-        const meta = noteCardMeta(p, readLocalPageMeta(p.id).title);
-        return {
-          page: p,
-          ...meta,
-          preview: meta.preview || 'اضغط وافتح مساحة كتابة هذه الملاحظة.',
-          dateLabel: noteTimeFmt.format(parseDateKey(p.page_date)),
-        };
-      }),
-    [sortedAllPages]
+      sortedAllPages
+        .map((p) => {
+          const meta = noteCardMeta(p, readLocalPageMeta(p.id).title);
+          return {
+            page: p,
+            ...meta,
+            preview: meta.preview || 'اضغط وافتح مساحة كتابة هذه الملاحظة.',
+            dateLabel: noteTimeFmt.format(parseDateKey(p.page_date)),
+            pinned: isPagePinned(p),
+            pinnedAt: p.pinned_at,
+            createdLabel: formatStamp(p.created_at),
+            editedLabel: formatStamp(noteUpdatedAt(p)),
+          };
+        })
+        .sort(pinnedFirst),
+    [sortedAllPages, pinnedIds]
   );
   const visibleNoteCards = notesScope === 'all' ? allNoteCards : noteCards;
 
@@ -586,6 +643,31 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     setPendingOpenPageId(targetPage.id);
     setFlip(targetPage.page_date < dateKey ? 'prev' : 'next');
     onDateChange(targetPage.page_date);
+  };
+
+  /** تثبيت/إلغاء تثبيت ملاحظة — يُحفظ في الصفحة ويُستبدل محلياً عند انقطاع الشبكة. */
+  const togglePin = (pageId, e) => {
+    e.stopPropagation();
+    navigator.vibrate?.(8);
+    const target = allPages.find((p) => p.id === pageId) ?? pages?.find((p) => p.id === pageId);
+    const isPinned = target ? isPagePinned(target) : pinnedIds.has(pageId);
+    const patch = {
+      is_pinned: !isPinned,
+      pinned_at: isPinned ? null : new Date().toISOString(),
+    };
+
+    setPages((ps) => ps?.map((p) => (p.id === pageId ? { ...p, ...patch } : p)) ?? ps);
+    setAllPages((ps) => ps.map((p) => (p.id === pageId ? { ...p, ...patch } : p)));
+    setPinnedIds((prev) => {
+      const next = new Set(prev);
+      if (isPinned) next.delete(pageId);
+      else next.add(pageId);
+      writePinnedIds(next);
+      return next;
+    });
+    void updatePage(pageId, patch).catch(() => {
+      // تبقى النسخة المحلية هي مصدر الحقيقة المؤقت حتى تتاح المزامنة.
+    });
   };
 
   /** أول كتابة في يوم فارغ: ننشئ الصفحة (إن لزم) وسطرها الأول */
@@ -1460,23 +1542,46 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
                 </button>
 		              ) : (
 		                visibleNoteCards.map((card) => (
-		                  <button
+		                  <div
 		                    key={card.page.id}
-		                    type="button"
-		                    className="note-card"
+		                    className={`note-card${card.pinned ? ' pinned' : ''}`}
+		                    role="button"
+		                    tabIndex={0}
 		                    onClick={() => openNoteCard(card.page)}
+		                    onKeyDown={(e) => {
+		                      if (e.key === 'Enter' || e.key === ' ') {
+		                        e.preventDefault();
+		                        openNoteCard(card.page);
+		                      }
+		                    }}
 		                  >
+		                    <button
+		                      type="button"
+		                      className="note-card-pin"
+		                      aria-label={card.pinned ? 'إلغاء التثبيت' : 'تثبيت الملاحظة'}
+		                      aria-pressed={card.pinned}
+		                      onClick={(e) => togglePin(card.page.id, e)}
+		                    >
+		                      <PinIcon size={16} filled={card.pinned} />
+		                    </button>
 		                    <span className="note-card-index">
                           {notesScope === 'all' ? `${card.dateLabel} · ` : ''}
                           ملاحظة {card.page.page_no}
                         </span>
 		                    <strong>{card.title}</strong>
 		                    <p>{card.preview}</p>
-	                    <span className="note-card-meta">
-	                      {card.lineCount || 'بدون'} سطر
-	                      {card.taskCount > 0 && ` · ${card.doneCount}/${card.taskCount} مهام`}
-	                    </span>
-	                  </button>
+	                    {card.pinned ? (
+	                      <span className="note-card-meta note-card-dates">
+	                        <span>بدأت {card.createdLabel || '—'}</span>
+	                        <span>آخر تعديل {card.editedLabel || '—'}</span>
+	                      </span>
+	                    ) : (
+	                      <span className="note-card-meta">
+	                        {card.lineCount || 'بدون'} سطر
+	                        {card.taskCount > 0 && ` · ${card.doneCount}/${card.taskCount} مهام`}
+	                      </span>
+	                    )}
+	                  </div>
 	                ))
 	              )}
             </section>

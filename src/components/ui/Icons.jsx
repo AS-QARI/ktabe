@@ -159,6 +159,16 @@ export function NoteIcon(props) {
   );
 }
 
+/** دبّوس تثبيت — تثبيت الملاحظة */
+export function PinIcon({ filled = false, ...props }) {
+  return (
+    <Svg {...props} fill={filled ? 'currentColor' : 'none'}>
+      <path d="M9 3.5h6l-1 5.2 2.8 2.8v1.6H7.2v-1.6L10 8.7z" />
+      <path d="M12 13.1V20" />
+    </Svg>
+  );
+}
+
 /** ساعة رملية — العدادات التنازلية */
 export function HourglassIcon(props) {
   return (
