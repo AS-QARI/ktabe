@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   exportAll,
   setBlockCompleted,
@@ -25,11 +25,9 @@ import Modal from '../components/ui/Modal';
 import {
   GearIcon,
   PlusIcon,
-  TrashIcon,
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  HourglassIcon,
   CalendarIcon,
 } from '../components/ui/Icons';
 import './screens.css';
@@ -99,6 +97,13 @@ function upcomingGroupLabel(dateKey, today) {
   return formatFullDate(parseDateKey(dateKey));
 }
 
+function completionGroupLabel(dateKey, today) {
+  const diff = diffDaysBetweenKeys(dateKey, today);
+  if (diff === 0) return 'أُنجزت اليوم';
+  if (diff === 1) return 'أُنجزت أمس';
+  return `أُنجزت في ${formatFullDate(parseDateKey(dateKey))}`;
+}
+
 function taskCountLabel(count) {
   if (count === 0) return '0 مهام';
   if (count === 1) return 'مهمة واحدة';
@@ -111,14 +116,14 @@ function taskCountLabel(count) {
  * توزيع ذكي لصفوف المعاينة على الأقسام الثلاثة:
  * القسم الفارغ ينكمش لشريط رفيع ولا يستهلك صفوفاً، ومساحته تذهب
  * للأقسام النشطة بالأولوية: اليوم ثم المتأخرة ثم القادمة.
- * ثلاثة أقسام نشطة → ٢+٢+٢ (كما هو متفق)، قسمان → حتى ٤ للأهم،
- * قسم واحد → حتى ٥ صفوف.
+ * الأعداد سخيّة كي تملأ شاشة آيفون 11 برو ماكس بلا فراغ:
+ * ثلاثة أقسام نشطة → حتى ٤ لكلٍّ، قسمان → حتى ٥، قسم واحد → حتى ٧.
  */
 function allocatePreviews(counts) {
   const order = ['today', 'late', 'next'];
   const activeCount = order.filter((k) => counts[k] > 0).length;
-  const cap = activeCount <= 1 ? 5 : activeCount === 2 ? 4 : 2;
-  let pool = activeCount <= 1 ? 5 : 6;
+  const cap = activeCount <= 1 ? 7 : activeCount === 2 ? 5 : 4;
+  let pool = activeCount <= 1 ? 7 : activeCount === 2 ? 10 : 12;
   const alloc = { today: 0, late: 0, next: 0 };
   for (const k of order) {
     alloc[k] = Math.min(2, counts[k], pool);
@@ -145,7 +150,6 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
   const today = todayKey();
 
   const [monthOpen, setMonthOpen] = useState(false);
-  const [countdownsOpen, setCountdownsOpen] = useState(false);
   const [countdownModalOpen, setCountdownModalOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [taskSheet, setTaskSheet] = useState(null);
@@ -194,6 +198,8 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
       for (const t of byDay.get(d)) {
         if (t.is_completed) {
           completed.push({ ...t, date: d });
+          // منجزة اليوم تبقى ظاهرة في «مهام اليوم» بعلامتها — لا تختفي عند الإكمال
+          if (d === today) todayList.push({ ...t, date: d });
           continue;
         }
         if (d < today) {
@@ -233,6 +239,20 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
   const upcomingTasks = upcomingGroups.flatMap((group) =>
     group.items.map((task) => ({ ...task, date: group.date }))
   );
+  const todayDoneCount = todayTasks.filter((t) => t.is_completed).length;
+  const completedGroups = useMemo(() => {
+    const groups = [];
+    for (const task of completedTasks) {
+      const date = keyFromTimestamp(task.completed_at);
+      let group = groups.at(-1);
+      if (!group || group.date !== date) {
+        group = { date, items: [] };
+        groups.push(group);
+      }
+      group.items.push(task);
+    }
+    return groups;
+  }, [completedTasks]);
 
   /* توزيع صفوف المعاينة حسب الأقسام غير الفارغة */
   const previewAlloc = useMemo(
@@ -287,7 +307,6 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
     return byDay;
   }, [countdowns]);
 
-  const nearestCountdown = countdowns.find((c) => c.meta.diff >= 0) ?? null;
 
   /* ---------- الإجراءات ---------- */
 
@@ -373,7 +392,6 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
     setMonthOpen(false);
     setTaskSheet(null);
     setCompletedOpen(false);
-    setCountdownsOpen(false);
     onOpenDay(dateKey);
   };
 
@@ -448,41 +466,20 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
 
         {data !== null && (
           <>
-            <button
-              type="button"
-              className={`countdown-hero${nearestCountdown ? ` ${nearestCountdown.meta.state}` : ' empty'}`}
-              onClick={() => nearestCountdown ? setCountdownsOpen(true) : setCountdownModalOpen(true)}
-            >
-              <span className="countdown-hero-icon">
-                <HourglassIcon size={20} />
-              </span>
-              {nearestCountdown ? (
-                <>
-                  <span className="countdown-hero-copy">
-                    <strong>{nearestCountdown.title}</strong>
-                    <small>{formatFullDate(parseDateKey(nearestCountdown.target_date))}</small>
-                  </span>
-                  <span className="countdown-hero-days">
-                    {nearestCountdown.meta.diff === 0 ? (
-                      <strong>اليوم</strong>
-                    ) : (
-                      <>
-                        <strong>{Math.abs(nearestCountdown.meta.diff)}</strong>
-                        <small>{countdownText(nearestCountdown.meta.diff)}</small>
-                      </>
-                    )}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="countdown-hero-copy">
-                    <strong>لا يوجد عداد قريب</strong>
-                    <small>أضف موعداً مهماً ليظهر هنا</small>
-                  </span>
-                  <span className="countdown-hero-add">إضافة</span>
-                </>
-              )}
-            </button>
+            <div className="countdown-strip" aria-label="العدادات التنازلية">
+              {countdowns.map((c) => (
+                <CountdownChip key={c.id} countdown={c} onDelete={removeCountdown} />
+              ))}
+              <button
+                type="button"
+                className="countdown-chip countdown-chip-add"
+                onClick={() => setCountdownModalOpen(true)}
+                aria-label="إضافة عداد تنازلي"
+              >
+                <PlusIcon size={22} />
+                <span>عدّاد جديد</span>
+              </button>
+            </div>
 
             <div
               className="task-snapshot"
@@ -533,10 +530,14 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                 tone="today"
                 title="مهام اليوم"
                 count={todayTasks.length}
+                subtitle={
+                  todayDoneCount > 0
+                    ? `أنجزت ${todayDoneCount} من ${todayTasks.length}`
+                    : undefined
+                }
                 tasks={todayTasks.slice(0, previewAlloc.today)}
-                empty="لا مهام مفتوحة اليوم"
+                empty="لا مهام اليوم بعد"
                 onMore={() => setTaskSheet({ type: 'today', title: 'مهام اليوم' })}
-                onAdd={() => setComposerOpen(true)}
               >
                 {(task) => (
                   <TaskPreviewRow
@@ -631,16 +632,24 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
             <p>لم تُكمل أي مهمة بعد</p>
           </div>
         ) : (
-          <div className="task-sheet-list">
-            {completedTasks.map((task) => (
-              <TaskPreviewRow
-                key={task.id}
-                task={task}
-                meta={relativeDayLabel(task.date)}
-                subCount={openSubCount.get(task.id) ?? 0}
-                onToggle={() => toggleBlock(task)}
-                onOpen={() => openDayAt(task.date)}
-              />
+          <div className="task-history">
+            {completedGroups.map((group) => (
+              <section key={group.date} className="task-history-group">
+                <header className="task-history-head">
+                  <strong>{completionGroupLabel(group.date, today)}</strong>
+                  <span>{taskCountLabel(group.items.length)}</span>
+                </header>
+                <div className="task-history-list">
+                  {group.items.map((task) => (
+                    <TaskHistoryRow
+                      key={task.id}
+                      task={task}
+                      onToggle={() => toggleBlock(task)}
+                      onOpen={() => openDayAt(task.date)}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}
@@ -725,35 +734,6 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
         <p className="calendar-sheet-hint">اضغط على أي يوم لفتح صفحته</p>
       </Modal>
 
-      {/* ورقة العدادات التنازلية */}
-      <Modal
-        open={countdownsOpen}
-        onClose={() => setCountdownsOpen(false)}
-        title="العدادات التنازلية"
-        headerAction={
-          <button
-            type="button"
-            className="btn-text"
-            onClick={() => setCountdownModalOpen(true)}
-          >
-            <PlusIcon size={18} /> جديد
-          </button>
-        }
-      >
-        {countdowns.length === 0 ? (
-          <div className="empty-state calendar-empty-countdowns">
-            <HourglassIcon size={40} />
-            <p>أضف مناسباتك المهمة وتابع كم يوماً يفصلك عنها</p>
-          </div>
-        ) : (
-          <div className="countdown-grid">
-            {countdowns.map((c) => (
-              <CountdownCard key={c.id} countdown={c} onDelete={removeCountdown} />
-            ))}
-          </div>
-        )}
-      </Modal>
-
       <CountdownModal
         open={countdownModalOpen}
         onClose={() => setCountdownModalOpen(false)}
@@ -770,7 +750,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
   );
 }
 
-function TaskPreviewSection({ tone, title, count, tasks, empty, onMore, onAdd, children }) {
+function TaskPreviewSection({ tone, title, count, subtitle, tasks, empty, onMore, onAdd, children }) {
   const hasMore = count > tasks.length;
 
   // قسم فارغ: شريط رفيع بدل بطاقة كاملة — المساحة تذهب للأقسام النشطة
@@ -791,7 +771,7 @@ function TaskPreviewSection({ tone, title, count, tasks, empty, onMore, onAdd, c
       <div className="task-preview-head">
         <div>
           <h2>{title}</h2>
-          <span>{taskCountLabel(count)}</span>
+          <span>{subtitle ?? taskCountLabel(count)}</span>
         </div>
         {hasMore && (
           <button type="button" className="task-preview-more" onClick={onMore}>
@@ -838,6 +818,29 @@ function TaskPreviewRow({ task, subCount, meta, onToggle, onOpen, action }) {
         )}
       </button>
       {action}
+    </div>
+  );
+}
+
+/** سجل المكتملات: تاريخ الإنجاز يقسم السجل، وتاريخ المهمة يظهر منفصلاً. */
+function TaskHistoryRow({ task, onToggle, onOpen }) {
+  return (
+    <div className="task-history-row">
+      <button
+        type="button"
+        className="task-history-check"
+        aria-label="إلغاء الإكمال"
+        onClick={onToggle}
+      >
+        <CheckIcon size={13} />
+      </button>
+      <button type="button" className="task-history-copy" onClick={onOpen}>
+        <span className="task-history-title">{plainContent(task.content) || 'مهمة بلا نص'}</span>
+        <span className="task-history-date">
+          <small>يوم المهمة</small>
+          {relativeDayLabel(task.date)}
+        </span>
+      </button>
     </div>
   );
 }
@@ -945,47 +948,52 @@ function TaskComposer({ open, today, onClose, onAdd }) {
   );
 }
 
-/** بطاقة عداد: الرقم الكبير هو البطل — كم يوماً بقي */
-function CountdownCard({ countdown, onDelete }) {
-  const { diff, state, progress } = countdown.meta ?? countdownMeta(countdown, todayKey());
+/**
+ * بطاقة عداد مضغوطة داخل الصف الأفقي — الرقم الكبير هو البطل.
+ * كل العدّادات ظاهرة دفعةً واحدة بلا فتح ورقة. اضغط مطولاً للحذف.
+ */
+function CountdownChip({ countdown, onDelete }) {
+  const timer = useRef(null);
+  const { diff, state } = countdown.meta ?? countdownMeta(countdown, todayKey());
   const dateLabel = new Intl.DateTimeFormat('ar-u-ca-gregory-nu-latn', {
     day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+    month: 'short',
   }).format(parseDateKey(countdown.target_date));
 
+  const cancel = () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+  const start = () => {
+    cancel();
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      onDelete(countdown);
+    }, 550);
+  };
+
   return (
-    <div className={`countdown-card ${state}`}>
-      <div className="countdown-top">
-        <span className="countdown-title">
-          <HourglassIcon size={16} />
-          {countdown.title}
-        </span>
-        <button
-          type="button"
-          className="icon-btn countdown-delete"
-          aria-label={`حذف ${countdown.title}`}
-          onClick={() => onDelete(countdown)}
-        >
-          <TrashIcon size={18} />
-        </button>
-      </div>
-      <div className="countdown-value">
-        {state === 'future' && (
-          <>
-            <span className="countdown-num">{diff}</span>
-            <span className="countdown-label">{countdownText(diff)}</span>
-          </>
+    <div
+      className={`countdown-chip ${state}`}
+      onPointerDown={start}
+      onPointerUp={cancel}
+      onPointerLeave={cancel}
+      onPointerCancel={cancel}
+      onContextMenu={(e) => e.preventDefault()}
+      title="اضغط مطولاً للحذف"
+    >
+      <span className="countdown-chip-main">
+        <span className="countdown-chip-title">{countdown.title}</span>
+        <span className="countdown-chip-date">{dateLabel}</span>
+      </span>
+      <span className="countdown-chip-days">
+        <strong>{state === 'now' ? 'اليوم' : Math.abs(diff)}</strong>
+        {state !== 'now' && (
+          <small>{state === 'past' ? 'مضى' : countdownText(diff)}</small>
         )}
-        {state === 'now' && <span className="countdown-now">هو اليوم!</span>}
-        {state === 'past' && (
-          <span className="countdown-past">مضى {daysAr(-diff)}</span>
-        )}
-      </div>
-      <div className="countdown-progress" aria-hidden="true">
-        <span style={{ inlineSize: `${progress}%` }} />
-      </div>
-      <div className="countdown-date">{dateLabel}</div>
+      </span>
     </div>
   );
 }

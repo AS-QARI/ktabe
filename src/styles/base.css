@@ -71,8 +71,10 @@ textarea {
 }
 
 .device-preview-app .app-shell {
-  padding-bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 36px);
-  overflow-y: auto;
+  /* الشاشات داخل الإطار ثابتة الارتفاع وتحسب شريط التنقل بنفسها،
+     فلا حاجة لحشوة سفلية إضافية تخلق فراغاً ميتاً تحت المحتوى */
+  padding-bottom: 0;
+  overflow: hidden;
   scrollbar-width: none;
 }
 
@@ -84,9 +86,12 @@ textarea {
   height: 100%;
 }
 
-.device-preview-app .day-screen {
+.device-preview-app .day-screen,
+.device-preview-app .calendar-screen,
+.device-preview-app .summary-screen {
   min-height: 0;
   height: calc(100% - var(--tabbar-height) - var(--safe-bottom) - 34px);
+  max-height: calc(100% - var(--tabbar-height) - var(--safe-bottom) - 34px);
 }
 
 /* ---------- شاشة التحميل وحالة الخطأ ---------- */

@@ -62,21 +62,22 @@ const TEXT_STYLES = [
   { value: 'sm', label: 'نص صغير', className: 'style-small' },
 ];
 
-function pageMetaKey(dateKey) {
-  return `kitabi-page-meta:${dateKey}`;
+function pageMetaKey(pageId) {
+  return `kitabi-page-meta:${pageId}`;
 }
 
-function readLocalPageMeta(dateKey) {
+function readLocalPageMeta(pageId) {
+  if (!pageId) return {};
   try {
-    return JSON.parse(localStorage.getItem(pageMetaKey(dateKey))) ?? {};
+    return JSON.parse(localStorage.getItem(pageMetaKey(pageId))) ?? {};
   } catch {
     return {};
   }
 }
 
-function writeLocalPageMeta(dateKey, patch) {
-  const next = { ...readLocalPageMeta(dateKey), ...patch };
-  localStorage.setItem(pageMetaKey(dateKey), JSON.stringify(next));
+function writeLocalPageMeta(pageId, patch) {
+  const next = { ...readLocalPageMeta(pageId), ...patch };
+  localStorage.setItem(pageMetaKey(pageId), JSON.stringify(next));
   return next;
 }
 
@@ -251,6 +252,29 @@ function isBold(content) {
 }
 
 /**
+ * عنوان ومعاينة بطاقة الملاحظة — مثل تطبيق ملاحظات آبل:
+ * العنوان الصريح إن وُجد، وإلا أول سطر مكتوب من داخل الملاحظة،
+ * والمعاينة هي السطر التالي غير المستهلك في العنوان.
+ */
+function noteCardMeta(p, localTitle = '') {
+  const pageBlocks = [...(p.blocks ?? [])].sort((a, b) => a.position - b.position);
+  const texts = pageBlocks.map((b) => contentText(b.content)).filter(Boolean);
+  const explicit = p.title?.trim() || localTitle.trim();
+  const derived = texts[0]
+    ? texts[0].length > 56
+      ? `${texts[0].slice(0, 56)}…`
+      : texts[0]
+    : null;
+  return {
+    title: explicit || derived || `ملاحظة ${p.page_no}`,
+    preview: (explicit ? texts[0] : texts[1]) || '',
+    lineCount: pageBlocks.length,
+    taskCount: pageBlocks.filter((b) => b.kind === 'task').length,
+    doneCount: pageBlocks.filter((b) => b.kind === 'task' && b.is_completed).length,
+  };
+}
+
+/**
  * شاشة "يومي" — تجربة كتابة مطابقة لتطبيق ملاحظات آبل:
  * مستند متصل يبدأ من الأعلى، Enter يقسم السطر عند المؤشر،
  * Enter على مهمة فارغة يخرج من قائمة المهام، Backspace في بداية
@@ -265,7 +289,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [pendingFocus, setPendingFocus] = useState(null);
   const [caretIntent, setCaretIntent] = useState('end'); // 'end' | 'start' | { offset }
   const [flip, setFlip] = useState('next');
-  const [localPageMeta, setLocalPageMeta] = useState(() => readLocalPageMeta(dateKey));
+  const [localPageMeta, setLocalPageMeta] = useState({});
   const [activePageId, setActivePageId] = useState(null);
   const [pendingOpenPageId, setPendingOpenPageId] = useState(null);
   const [notesScope, setNotesScope] = useState('day');
@@ -279,7 +303,6 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
   const lastEditRef = useRef(0);
   const saveTimers = useRef(new Map());
-  const pageSaveTimer = useRef(null);
   const inputRefs = useRef(new Map());
   const dateInputRef = useRef(null);
   const paperLinesRef = useRef(null);
@@ -313,10 +336,6 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     setFormatMenuOpen(false);
     load();
   }, [load]);
-
-  useEffect(() => {
-    setLocalPageMeta(readLocalPageMeta(dateKey));
-  }, [dateKey]);
 
   useEffect(() => {
     const updateMobileChrome = () => {
@@ -364,11 +383,28 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     () => [...allPages].sort((a, b) => noteUpdatedAt(b) - noteUpdatedAt(a)),
     [allPages]
   );
+  // أيام تحمل كتابة فعلية: عنوان أو سطر واحد على الأقل غير فارغ
+  const writtenDayKeys = useMemo(() => {
+    const keys = new Set();
+    for (const p of allPages) {
+      const written =
+        Boolean(p.title?.trim()) ||
+        (p.blocks ?? []).some((b) => !isEmptyContent(b.content));
+      if (written) keys.add(p.page_date);
+    }
+    return keys;
+  }, [allPages]);
   const page = sortedPages.find((p) => p.id === activePageId) ?? null;
   const blocks = useMemo(() => page?.blocks ?? [], [page]);
+
+  // نسخة محلية لكل ملاحظة تحمي العنوان إن أُغلق التطبيق قبل اكتمال المزامنة.
+  useEffect(() => {
+    setLocalPageMeta(readLocalPageMeta(page?.id));
+  }, [page?.id]);
+
   const pageMeta = {
     ...localPageMeta,
-    ...(page?.title != null ? { title: page.title } : {}),
+    ...(page?.title?.trim() ? { title: page.title } : {}),
     ...(page?.text_size != null ? { text_size: page.text_size } : {}),
   };
 
@@ -406,17 +442,11 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const noteCards = useMemo(
     () =>
       sortedPages.map((p) => {
-        const pageBlocks = [...(p.blocks ?? [])].sort((a, b) => a.position - b.position);
-        const firstText = pageBlocks.map((b) => contentText(b.content)).find(Boolean);
-        const taskCount = pageBlocks.filter((b) => b.kind === 'task').length;
-        const doneCount = pageBlocks.filter((b) => b.kind === 'task' && b.is_completed).length;
+        const meta = noteCardMeta(p, readLocalPageMeta(p.id).title);
         return {
           page: p,
-          title: p.title?.trim() || `ملاحظة ${p.page_no}`,
-          preview: firstText || 'اضغط وافتح مساحة كتابة جديدة لهذه الملاحظة.',
-          lineCount: pageBlocks.length,
-          taskCount,
-          doneCount,
+          ...meta,
+          preview: meta.preview || 'اضغط وافتح مساحة كتابة جديدة لهذه الملاحظة.',
         };
       }),
     [sortedPages]
@@ -424,17 +454,11 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const allNoteCards = useMemo(
     () =>
       sortedAllPages.map((p) => {
-        const pageBlocks = [...(p.blocks ?? [])].sort((a, b) => a.position - b.position);
-        const firstText = pageBlocks.map((b) => contentText(b.content)).find(Boolean);
-        const taskCount = pageBlocks.filter((b) => b.kind === 'task').length;
-        const doneCount = pageBlocks.filter((b) => b.kind === 'task' && b.is_completed).length;
+        const meta = noteCardMeta(p, readLocalPageMeta(p.id).title);
         return {
           page: p,
-          title: p.title?.trim() || `ملاحظة ${p.page_no}`,
-          preview: firstText || 'اضغط وافتح مساحة كتابة هذه الملاحظة.',
-          lineCount: pageBlocks.length,
-          taskCount,
-          doneCount,
+          ...meta,
+          preview: meta.preview || 'اضغط وافتح مساحة كتابة هذه الملاحظة.',
           dateLabel: noteTimeFmt.format(parseDateKey(p.page_date)),
         };
       }),
@@ -461,9 +485,10 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
           day: dayNumberFmt.format(dayDate),
           isToday: key === todayKey(),
           isSelected: key === dateKey,
+          hasContent: writtenDayKeys.has(key),
         };
       }),
-    [dateKey]
+    [dateKey, writtenDayKeys]
   );
 
   // تركيز السطر الجديد/التالي بعد اكتمال الرسم.
@@ -495,15 +520,14 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     markEdit();
     try {
       const p = await ensurePage();
-      setLocalPageMeta(writeLocalPageMeta(dateKey, patch));
+      setLocalPageMeta(writeLocalPageMeta(p.id, patch));
       setPages((ps) => ps.map((x) => (x.id === p.id ? { ...x, ...patch } : x)));
       touchPageInAllPages(p.id, (x) => ({ ...x, ...patch }));
-      clearTimeout(pageSaveTimer.current);
-      pageSaveTimer.current = setTimeout(() => {
-        updatePage(p.id, patch).catch(() => {});
-      }, 500);
+      // العنوان يُرسل فوراً، فلا تضيع آخر كتابة إذا خرج المستخدم مباشرةً.
+      void updatePage(p.id, patch).catch(() => {});
     } catch {
-      setLocalPageMeta(writeLocalPageMeta(dateKey, patch));
+      // تبقى النسخة المحلية كحل احتياطي إذا انقطعت الشبكة أثناء الحفظ.
+      if (page?.id) setLocalPageMeta(writeLocalPageMeta(page.id, patch));
     }
   };
 
@@ -530,6 +554,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     const created = await createPage(dateKey, 1);
     const nextPage = { ...created, blocks: [] };
     setPages([nextPage]);
+    setAllPages((ps) => [nextPage, ...ps]);
     setActivePageId(nextPage.id);
     return nextPage;
   };
@@ -1334,6 +1359,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
                 'day-rail-item',
                 item.isSelected ? 'selected' : '',
                 item.isToday ? 'today' : '',
+                item.hasContent ? 'has-content' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -1342,6 +1368,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             >
               <span>{item.weekday}</span>
               <strong>{item.day}</strong>
+              <i className="day-rail-dot" aria-hidden="true" />
             </button>
           ))}
         </div>

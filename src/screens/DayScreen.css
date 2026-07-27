@@ -99,6 +99,7 @@
 }
 
 .day-rail-item {
+  position: relative;
   min-width: 0;
   min-height: 48px;
   display: grid;
@@ -114,6 +115,26 @@
 
 .day-rail-item:active {
   transform: scale(0.94);
+}
+
+/* نقطة أسفل اليوم تدل على وجود كتابة فيه */
+.day-rail-dot {
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--checklist-accent);
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+
+.day-rail-item.has-content .day-rail-dot {
+  opacity: 1;
+}
+
+.day-rail-item.selected .day-rail-dot {
+  background: #000;
 }
 
 .day-rail-item span {
@@ -215,6 +236,22 @@
   .day-screen {
     background-color: var(--bg);
   }
+}
+
+/* داخل إطار المعاينة: النافذة قد تكون عريضة فتتفعّل أنماط سطح المكتب
+   بالخطأ (كراسة بحواف + ارتفاع تلقائي). نفرض مظهر الجوال هنا صراحةً. */
+.device-preview-app .day-screen {
+  height: calc(100% - var(--tabbar-height) - var(--safe-bottom) - 34px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.device-preview-app .paper {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 28px 28px 0 0;
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 /* ========== أنيميشن قلب الصفحة 3D — سريع وسلس ========== */

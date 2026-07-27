@@ -9,7 +9,9 @@ import puppeteer from 'puppeteer-core';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME =
+  process.env.CHROME_PATH ??
+  'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const BASE_URL = 'http://127.0.0.1:5173';
 const OUT_DIR = process.argv[2] ?? 'screenshots';
 const TABS = ['day', 'calendar', 'summary'];

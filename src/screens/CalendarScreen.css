@@ -85,8 +85,8 @@
 
 .calendar-dashboard {
   min-height: 0;
-  display: grid;
-  grid-template-rows: minmax(126px, 0.68fr) minmax(0, 1.82fr);
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
   overflow: hidden;
 }
@@ -98,6 +98,124 @@
   inset-block-start: calc(var(--safe-top) + 54px);
   margin: 0;
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
+}
+
+/* ---------- صف العدّادات التنازلية (كلها ظاهرة، تمرير أفقي) ---------- */
+
+.countdown-strip {
+  flex: 0 0 auto;
+  min-height: 0;
+  /* سقف يمنع العدّادات من ابتلاع مساحة المهام — تُظهر ~3 ثم تتمرّر داخلياً */
+  max-height: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-inline-end: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.countdown-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.countdown-chip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 46px;
+  padding: 6px var(--space-4);
+  border-radius: 16px;
+  text-align: start;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.12), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.countdown-chip-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.countdown-chip-title {
+  font-size: 15px;
+  font-weight: 850;
+  color: var(--label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countdown-chip-date {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--calendar-warm-soft);
+}
+
+.countdown-chip-days {
+  flex: 0 0 auto;
+  min-width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.countdown-chip-days strong {
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.14);
+}
+
+.countdown-chip-days small {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.countdown-chip.now {
+  border-color: rgba(255, 159, 10, 0.5);
+}
+
+.countdown-chip.now .countdown-chip-days strong {
+  font-size: 16px;
+}
+
+.countdown-chip.past {
+  opacity: 0.6;
+}
+
+.countdown-chip-add {
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--label-secondary);
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.countdown-chip-add:active {
+  transform: scale(0.99);
 }
 
 /* ---------- العداد الرئيسي ---------- */
@@ -158,6 +276,19 @@
   color: rgba(255, 255, 255, 0.56);
 }
 
+/* شارة تدل على وجود عدّادات أخرى خلف الأقرب — تفتح القائمة الكاملة */
+.countdown-hero-more {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--checklist-accent, #ffd39a);
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .countdown-hero-days {
   min-width: 76px;
   display: flex;
@@ -194,6 +325,7 @@
 /* ---------- لقطة المهام ---------- */
 
 .task-snapshot {
+  flex: 1 1 0;
   min-height: 0;
   display: grid;
   grid-template-rows: repeat(3, minmax(0, 1fr));
@@ -466,6 +598,109 @@
   color: #f4f4f4;
   font-size: 12px;
   font-weight: 800;
+}
+
+/* ---------- سجل المهام المكتملة ---------- */
+
+.task-history {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-block: 4px;
+}
+
+.task-history-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-history-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-inline: 4px;
+}
+
+.task-history-head strong {
+  color: var(--label);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.task-history-head span {
+  color: var(--label-tertiary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.task-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.task-history-row {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.task-history-check {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #050506;
+}
+
+.task-history-copy {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: start;
+}
+
+.task-history-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--label);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-history-date {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.075);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.task-history-date small {
+  color: var(--label-tertiary);
+  font-size: inherit;
+  font-weight: 500;
 }
 
 /* ---------- ورقة الشهر (داخل النافذة المنزلقة) ---------- */
