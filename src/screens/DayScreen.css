@@ -637,7 +637,7 @@
   flex-direction: column;
   overflow-y: auto;
   gap: 0;
-  padding: 12px 12px calc(var(--keyboard-inset, 0px) + 116px);
+  padding: 14px 18px calc(var(--keyboard-inset, 0px) + 116px);
   scroll-padding-bottom: calc(var(--keyboard-inset, 0px) + 120px);
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.08) transparent;
@@ -673,7 +673,7 @@
   position: relative;
   display: flex;
   align-items: flex-start;
-  min-height: var(--rule-h);
+  min-height: 40px;
   border-radius: 0;
   background: transparent;
   border: 0;
@@ -795,11 +795,11 @@
 
 /* الهامش: تسكن فيه دائرة المهمة فقط */
 .line-gutter {
-  width: 40px;
+  width: 38px;
   flex-shrink: 0;
   display: flex;
   justify-content: center;
-  padding-top: calc((var(--rule-h) - 22px) / 2);
+  padding-top: 9px;
   -webkit-user-select: none;
   user-select: none;
 }
@@ -891,12 +891,12 @@
   box-shadow: none;
   overflow: visible;
   height: auto;
-  min-height: var(--rule-h);
+  min-height: 40px;
   font: inherit;
   /* حجم نص ملاحظات آبل */
-  font-size: 16.5px;
-  line-height: 1.45;
-  padding: 7px 4px;
+  font-size: 17px;
+  line-height: 1.55;
+  padding: 6px 5px;
   color: var(--label);
   caret-color: var(--checklist-accent);
   -webkit-tap-highlight-color: transparent;
@@ -915,7 +915,18 @@
 }
 
 .is-task .line-input {
-  font-weight: 500;
+  font-weight: 550;
+}
+
+/* الفراغات غير المقصودة لا تبتلع مساحة الصفحة؛ بمجرد لمسها تعود
+   كسطر كتابة طبيعي. المهام الفارغة تبقى بالحجم الكامل كي تظل دائرتها سهلة اللمس. */
+.paper-line.is-empty:not(.is-task) {
+  min-height: 28px;
+}
+
+.paper-line.is-empty:not(.is-task) .line-input {
+  min-height: 28px;
+  padding-block: 3px;
 }
 
 /* مكتملة: النص يخفت فقط — آبل لا تشطب نص المهام المنجزة */

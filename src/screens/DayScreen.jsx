@@ -271,8 +271,13 @@ function applyInlineTextSize(el, size) {
 
 /** يمدد ارتفاع السطر مع التفاف النص — فيبقى النص جالساً على التسطير */
 function autoGrow(el) {
-  el.style.height = 'auto';
-  el.style.height = `${Math.max(el.scrollHeight, el.offsetHeight)}px`;
+  // نبدأ من الصفر، لا من الارتفاع السابق. استخدام offsetHeight هنا كان
+  // يورّث ارتفاعاً كبيراً للسطر بعد التنقل/الكتابة ويصنع فراغات عمودية.
+  const isBlank = !el.textContent.replace(/\u200b/g, '').trim();
+  const isEditing = document.activeElement === el;
+  const minHeight = isBlank && !isEditing ? 28 : 40;
+  el.style.height = '0px';
+  el.style.height = `${Math.max(el.scrollHeight, minHeight)}px`;
 }
 
 /** استخراج محتوى Bold من النص: هل يحتوي على ** عند الطرفين؟ */
@@ -1910,6 +1915,7 @@ function PaperLine({
 }) {
   const { block, depth } = row;
   const isTask = block.kind === 'task';
+  const isEmpty = isEmptyContent(block.content);
   const bold = isBold(block.content);
   const longPressTimer = useRef(null);
   const circleDraggingRef = useRef(false);
@@ -1969,6 +1975,7 @@ function PaperLine({
         'paper-line',
         depth > 0 ? 'sub' : '',
         isTask ? 'is-task' : '',
+        isEmpty && !isFocused && !isTask ? 'is-empty' : '',
         isTask && block.is_completed ? 'done' : '',
         bold ? 'is-bold' : '',
         isNestTarget ? 'subtask-drop-target' : '',
