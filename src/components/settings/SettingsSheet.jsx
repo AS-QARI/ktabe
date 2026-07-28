@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Modal from '../ui/Modal';
 import PrintView from './PrintView';
+import TrashSheet from './TrashSheet';
 import { changePin, exportAll, importAll } from '../../data/storage';
 import { clearUnlock } from '../../lib/session';
 import { downloadJson } from '../../utils/download';
@@ -10,6 +11,7 @@ import {
   UploadIcon,
   PrinterIcon,
   LockIcon,
+  TrashIcon,
   ChevronLeftIcon,
 } from '../ui/Icons';
 import './SettingsSheet.css';
@@ -26,6 +28,7 @@ export default function SettingsSheet({ open, onClose }) {
   const [pinMsg, setPinMsg] = useState(null); // { ok, text }
   const [busy, setBusy] = useState(false);
   const [printData, setPrintData] = useState(null);
+  const [trashOpen, setTrashOpen] = useState(false);
   const fileInput = useRef(null);
 
   useEffect(() => {
@@ -245,6 +248,15 @@ export default function SettingsSheet({ open, onClose }) {
             </button>
           </div>
 
+          <p className="settings-group-title">البيانات</p>
+          <div className="card-list">
+            <button type="button" className="settings-row" onClick={() => setTrashOpen(true)}>
+              <span className="settings-row-icon danger"><TrashIcon size={20} /></span>
+              <span className="settings-row-label">سلة المحذوفات</span>
+              <span className="settings-row-value">استرجاع العناصر</span>
+            </button>
+          </div>
+
           <p className="settings-footer">
             كتابي — تطبيقك الشخصي. البيانات محفوظة في قاعدة بياناتك الخاصة
             على Supabase وتتزامن بين أجهزتك تلقائياً.
@@ -261,6 +273,7 @@ export default function SettingsSheet({ open, onClose }) {
       />
 
       {printData && <PrintView data={printData} />}
+      <TrashSheet open={trashOpen} onClose={() => setTrashOpen(false)} />
     </>
   );
 }

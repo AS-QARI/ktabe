@@ -6,8 +6,8 @@ import {
   updatePage,
   createBlock,
   updateBlock,
-  setBlockCompleted,
-  deleteBlock,
+  completeBlock,
+  trashBlock,
   onTablesChange,
 } from '../data/storage';
 import {
@@ -287,7 +287,7 @@ function isBold(content) {
  * السطر التالي غير المستهلك في العنوان.
  */
 function noteCardMeta(p, localTitle = '') {
-  const allBlocks = p.blocks ?? [];
+  const allBlocks = (p.blocks ?? []).filter((block) => !block.deleted_at);
   // العنوان والمعاينة من السطور الرئيسية بترتيبها الحقيقي فقط — لا نخلط
   // السطور الفرعية (المعشّشة) لأن مواضعها تتداخل مع الجذور فتُفسد الترتيب.
   const rootTexts = allBlocks
@@ -337,6 +337,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [keyboardInset, setKeyboardInset] = useState(0);
   const [selectMode, setSelectMode] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [saveState, setSaveState] = useState('saved'); // saved | saving | error
 
   const lastEditRef = useRef(0);
   const saveTimers = useRef(new Map());
@@ -349,6 +350,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
   const markEdit = () => {
     lastEditRef.current = Date.now();
+    setSaveState('saving');
   };
 
   const load = useCallback(async () => {
@@ -360,6 +362,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       setPages(dayPages);
       setAllPages(everyPage);
       setError(null);
+      setSaveState('saved');
     } catch (e) {
       setError(e.message);
     }
@@ -432,7 +435,10 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     return keys;
   }, [allPages]);
   const page = sortedPages.find((p) => p.id === activePageId) ?? null;
-  const blocks = useMemo(() => page?.blocks ?? [], [page]);
+  const blocks = useMemo(
+    () => (page?.blocks ?? []).filter((block) => !block.deleted_at),
+    [page]
+  );
 
   // نسخة محلية لكل ملاحظة تحمي العنوان إن أُغلق التطبيق قبل اكتمال المزامنة.
   useEffect(() => {
@@ -469,7 +475,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
   const focusedRow = rows.find((r) => r.block.id === focusedId) ?? null;
   const dayBlocks = useMemo(
-    () => sortedPages.flatMap((p) => p.blocks ?? []),
+    () => sortedPages.flatMap((p) => (p.blocks ?? []).filter((block) => !block.deleted_at)),
     [sortedPages]
   );
   const dayTasks = dayBlocks.filter((b) => b.kind === 'task');
@@ -581,7 +587,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       setPages((ps) => ps.map((x) => (x.id === p.id ? { ...x, ...patch } : x)));
       touchPageInAllPages(p.id, (x) => ({ ...x, ...patch }));
       // العنوان يُرسل فوراً، فلا تضيع آخر كتابة إذا خرج المستخدم مباشرةً.
-      void updatePage(p.id, patch).catch(() => {});
+      void updatePage(p.id, patch)
+        .then(() => setSaveState('saved'))
+        .catch(() => setSaveState('error'));
     } catch {
       // تبقى النسخة المحلية كحل احتياطي إذا انقطعت الشبكة أثناء الحفظ.
       if (page?.id) setLocalPageMeta(writeLocalPageMeta(page.id, patch));
@@ -601,7 +609,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     saveTimers.current.set(
       block.id,
       setTimeout(() => {
-        updateBlock(block.id, { content: value }).catch(() => {});
+        updateBlock(block.id, { content: value })
+          .then(() => setSaveState('saved'))
+          .catch(() => setSaveState('error'));
       }, 700)
     );
   };
@@ -792,9 +802,13 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     const i = rows.findIndex((r) => r.block.id === row.block.id);
     const prev = rows[i - 1];
     mutate((bs) =>
-      bs.filter((b) => b.id !== row.block.id && b.parent_id !== row.block.id)
+      bs.map((block) =>
+        block.id === row.block.id || block.parent_id === row.block.id
+          ? { ...block, deleted_at: new Date().toISOString() }
+          : block
+      )
     );
-    deleteBlock(row.block.id).catch(() => load());
+    trashBlock(row.block.id).then(() => setSaveState('saved')).catch(() => { setSaveState('error'); load(); });
     if (prev) {
       setCaretIntent('end');
       setPendingFocus(prev.block.id);
@@ -826,7 +840,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         updateBlock(prev.block.id, { content: merged }).catch(() => {});
       }, 400)
     );
-    deleteBlock(row.block.id).catch(() => load());
+    trashBlock(row.block.id).then(() => setSaveState('saved')).catch(() => { setSaveState('error'); load(); });
     setCaretIntent({ offset });
     setPendingFocus(prev.block.id);
   };
@@ -849,7 +863,15 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         b.id === block.id ? { ...b, is_completed: done, completed_at: completedAt } : b
       ),
     }));
-    setBlockCompleted(block.id, done).catch(() => load());
+    completeBlock(block, done)
+      .then(({ repeated }) => {
+        if (repeated) {
+          mutate((bs) => [...bs, repeated]);
+          touchPageInAllPages(block.page_id, (p) => ({ ...p, blocks: [...(p.blocks ?? []), repeated] }));
+        }
+        setSaveState('saved');
+      })
+      .catch(() => { setSaveState('error'); load(); });
   };
 
   /** تحويل نص ↔ مهمة (زر قائمة المهام في شريط الأدوات — مثل آبل) */
@@ -1421,6 +1443,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             العودة لليوم
           </button>
         )}
+        <span className={`day-save-status ${saveState}`} role="status">
+          {saveState === 'saving' ? 'جارٍ الحفظ' : saveState === 'error' ? 'لم يُحفظ' : 'محفوظ'}
+        </span>
         <button
           type="button"
           className="icon-btn day-settings-btn"

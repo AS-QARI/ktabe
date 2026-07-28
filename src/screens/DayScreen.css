@@ -72,6 +72,17 @@
   margin-inline-start: auto;
 }
 
+.day-save-status {
+  margin-inline-start: auto;
+  padding-inline: 9px;
+  color: var(--label-tertiary);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.day-save-status.saving { color: #ffd39a; }
+.day-save-status.error { color: var(--danger); }
+
 /* ---------- تنقل اليوم المضغوط ---------- */
 
 .day-compact-nav {

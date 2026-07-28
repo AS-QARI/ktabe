@@ -10,7 +10,7 @@ function dayOf(timestamp) {
 }
 
 function taskBlocks(data) {
-  return data.blocks.filter((b) => b.kind === 'task');
+  return data.blocks.filter((b) => b.kind === 'task' && !b.deleted_at);
 }
 
 function completedTasks(data) {
@@ -28,13 +28,12 @@ function completionDays(data) {
  */
 export function computeTodayProgress(data) {
   const today = todayKey();
-  const todayPageIds = new Set(
-    data.pages.filter((p) => p.page_date === today).map((p) => p.id)
-  );
+  const pageDates = new Map(data.pages.map((page) => [page.id, page.page_date]));
   const tasks = taskBlocks(data);
-  const onToday = tasks.filter((t) => todayPageIds.has(t.page_id));
+  const onToday = tasks.filter((task) => (task.due_date ?? pageDates.get(task.page_id)) === today);
+  const todayIds = new Set(onToday.map((task) => task.id));
   const doneElsewhere = tasks.filter(
-    (t) => !todayPageIds.has(t.page_id) && dayOf(t.completed_at) === today
+    (task) => !todayIds.has(task.id) && dayOf(task.completed_at) === today
   );
   const total = onToday.length + doneElsewhere.length;
   const done =

@@ -96,3 +96,9 @@
   padding: var(--space-5) var(--space-4) var(--space-2);
   line-height: 1.6;
 }
+
+.settings-row-value { margin-inline-start: auto; color: var(--label-tertiary); font-size: 12px; }
+.trash-list { display: flex; flex-direction: column; gap: 8px; }
+.trash-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border-radius: 13px; background: var(--fill); }
+.trash-row > div:first-child { min-width: 0; display: grid; gap: 3px; }.trash-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }.trash-row small { color: var(--label-tertiary); font-size: 11px; }
+.trash-actions { display: flex; gap: 5px; flex: 0 0 auto; }.trash-actions button { min-height: 34px; padding-inline: 9px; border-radius: 9px; background: rgba(255,255,255,.12); font-size: 12px; font-weight: 700; }.trash-actions button.danger { color: var(--danger); }

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import {
   exportAll,
-  setBlockCompleted,
+  completeBlock,
   createCountdown,
   deleteCountdown,
   createPage,
@@ -176,18 +176,20 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
     const subCount = new Map();
 
     for (const b of data?.blocks ?? []) {
-      if (b.kind !== 'task') continue;
+      if (b.kind !== 'task' || b.deleted_at) continue;
       if (b.parent_id) {
         if (!b.is_completed) subCount.set(b.parent_id, (subCount.get(b.parent_id) ?? 0) + 1);
         continue;
       }
-      const d = pageDate.get(b.page_id);
+      // تاريخ الاستحقاق مستقل عن يوم كتابة الملاحظة. المهام القديمة
+      // التي لا تملك موعداً تستخدم تاريخ صفحتها تلقائياً.
+      const d = b.due_date ?? pageDate.get(b.page_id);
       if (!d) continue;
       if (!byDay.has(d)) byDay.set(d, []);
       byDay.get(d).push(b);
     }
     for (const list of byDay.values()) {
-      list.sort((a, b) => a.position - b.position);
+      list.sort((a, b) => (b.priority || 0) - (a.priority || 0) || a.position - b.position);
     }
 
     const overdueList = [];
@@ -211,7 +213,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
         }
       }
     }
-    todayList.sort((a, b) => a.position - b.position);
+    todayList.sort((a, b) => (b.priority || 0) - (a.priority || 0) || a.position - b.position);
     completed.sort((a, b) => {
       const aTime = a.completed_at ? new Date(a.completed_at).getTime() : 0;
       const bTime = b.completed_at ? new Date(b.completed_at).getTime() : 0;
@@ -322,7 +324,12 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
           : b
       ),
     }));
-    setBlockCompleted(block.id, done).catch(() => live.reload());
+    completeBlock(block, done)
+      .then(({ repeated }) => {
+        if (!repeated) return;
+        live.setData((d) => ({ ...d, blocks: [...d.blocks, repeated] }));
+      })
+      .catch(() => live.reload());
   };
 
   /** صفحة يوم محدد — الأولى إن تعددت، وتُنشأ إن لم توجد */
@@ -342,37 +349,38 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
 
   /**
    * نقل مهمة متأخرة إلى صفحة اليوم (سلوك «أعد جدولتها لليوم»
-   * في Todoist وAny.do): تنتقل بأبنائها لنهاية صفحة اليوم.
+   * في Todoist وAny.do): يتغير الموعد فقط، وتبقى المهمة في ملاحظتها
+   * الأصلية كي لا تفقد سياقها.
    */
   const moveTaskToToday = async (task) => {
     navigator.vibrate?.(12);
     try {
-      const page = await ensurePageFor(today);
-      const position = nextRootPosition(page.id, data?.blocks ?? []);
       live.setData((d) => ({
         ...d,
-        pages: d.pages.some((p) => p.id === page.id) ? d.pages : [...d.pages, page],
         blocks: d.blocks.map((b) => {
-          if (b.id === task.id) return { ...b, page_id: page.id, parent_id: null, position };
-          if (b.parent_id === task.id) return { ...b, page_id: page.id };
+          if (b.id === task.id) return { ...b, due_date: today };
           return b;
         }),
       }));
-      await updateBlock(task.id, { page_id: page.id, parent_id: null, position });
-      const children = (data?.blocks ?? []).filter((b) => b.parent_id === task.id);
-      await Promise.all(
-        children.map((c) => updateBlock(c.id, { page_id: page.id }))
-      );
+      await updateBlock(task.id, { due_date: today });
     } catch {
       live.reload();
     }
   };
 
   /** إضافة مهمة جديدة على يوم محدد (اليوم/غداً/أي تاريخ) */
-  const addTask = async (dateKey, text) => {
+  const addTask = async ({ dateKey, text, priority, repeatRule }) => {
     const page = await ensurePageFor(dateKey);
     const position = nextRootPosition(page.id, data?.blocks ?? []);
-    await createBlock({ page_id: page.id, kind: 'task', content: text, position });
+    await createBlock({
+      page_id: page.id,
+      kind: 'task',
+      content: text,
+      position,
+      due_date: dateKey,
+      priority,
+      repeat_rule: repeatRule,
+    });
     await live.reload();
   };
 
@@ -809,11 +817,15 @@ function TaskPreviewRow({ task, subCount, meta, onToggle, onOpen, action }) {
       </button>
       <button type="button" className="task-preview-text" onClick={onOpen}>
         <span className="task-preview-title">{plainContent(task.content) || 'مهمة بلا نص'}</span>
-        {(meta || subCount > 0) && (
+        {(meta || subCount > 0 || task.repeat_rule !== 'none' || task.priority > 1) && (
           <span className="task-preview-meta">
             {meta}
             {meta && subCount > 0 ? ' · ' : ''}
             {subCount > 0 ? `${subCount} فرعية` : ''}
+            {(meta || subCount > 0) && (task.repeat_rule !== 'none' || task.priority > 1) ? ' · ' : ''}
+            {task.repeat_rule !== 'none' ? 'متكررة' : ''}
+            {task.repeat_rule !== 'none' && task.priority > 1 ? ' · ' : ''}
+            {task.priority === 3 ? 'عاجلة' : task.priority === 2 ? 'مهمة' : ''}
           </span>
         )}
       </button>
@@ -851,6 +863,8 @@ function TaskComposer({ open, today, onClose, onAdd }) {
   const [choice, setChoice] = useState('today'); // today | tomorrow | custom
   const [customDate, setCustomDate] = useState('');
   const [busy, setBusy] = useState(false);
+  const [priority, setPriority] = useState(0);
+  const [repeatRule, setRepeatRule] = useState('none');
 
   const tomorrow = useMemo(() => {
     const d = parseDateKey(today);
@@ -865,6 +879,8 @@ function TaskComposer({ open, today, onClose, onAdd }) {
     setText('');
     setChoice('today');
     setCustomDate('');
+    setPriority(0);
+    setRepeatRule('none');
     setBusy(false);
   };
 
@@ -873,7 +889,7 @@ function TaskComposer({ open, today, onClose, onAdd }) {
     if (!canSave) return;
     setBusy(true);
     try {
-      await onAdd(dateKey, text.trim());
+      await onAdd({ dateKey, text: text.trim(), priority, repeatRule });
       reset();
       onClose();
     } catch {
@@ -938,6 +954,30 @@ function TaskComposer({ open, today, onClose, onAdd }) {
               onChange={(e) => setCustomDate(e.target.value)}
             />
           )}
+        </div>
+
+        <div className="field">
+          <span className="field-label">تنظيم المهمة</span>
+          <div className="composer-task-options">
+            <label>
+              <span>الأولوية</span>
+              <select value={priority} onChange={(e) => setPriority(Number(e.target.value))}>
+                <option value="0">عادية</option>
+                <option value="1">منخفضة</option>
+                <option value="2">مهمة</option>
+                <option value="3">عاجلة</option>
+              </select>
+            </label>
+            <label>
+              <span>التكرار</span>
+              <select value={repeatRule} onChange={(e) => setRepeatRule(e.target.value)}>
+                <option value="none">مرة واحدة</option>
+                <option value="daily">يومياً</option>
+                <option value="weekly">أسبوعياً</option>
+                <option value="monthly">شهرياً</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <button type="submit" className="btn-primary" disabled={!canSave}>

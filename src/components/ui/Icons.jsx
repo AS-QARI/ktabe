@@ -159,6 +159,26 @@ export function NoteIcon(props) {
   );
 }
 
+/** بحث */
+export function SearchIcon(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m16 16 4.5 4.5" />
+    </Svg>
+  );
+}
+
+/** وسم */
+export function TagIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M20.5 13.5 13.6 20.4a2.1 2.1 0 0 1-3 0L3.5 13.3V4.5h8.8l8.2 8.1a.65.65 0 0 1 0 .9z" />
+      <circle cx="8.1" cy="8.1" r="1" />
+    </Svg>
+  );
+}
+
 /** دبّوس تثبيت — تثبيت الملاحظة */
 export function PinIcon({ filled = false, ...props }) {
   return (
@@ -373,4 +393,3 @@ export function KeyboardHideIcon(props) {
     </Svg>
   );
 }
-

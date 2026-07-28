@@ -1,5 +1,7 @@
 ﻿import { supabase } from '../lib/supabaseClient';
 
+import { pagesFromSnapshot, readOfflineSnapshot, writeOfflineSnapshot } from '../lib/offlineCache';
+
 /* =====================================================================
    Ø·Ø¨Ù‚Ø© Ø§Ù„ÙˆØµÙˆÙ„ Ù„Ù„Ø¨ÙŠØ§Ù†Ø§Øª (Data Access Layer)
    ---------------------------------------------------------------------
@@ -54,25 +56,40 @@ export async function changePin(oldPin, newPin) {
 
 /** ØµÙØ­Ø§Øª ÙŠÙˆÙ… Ù…Ø­Ø¯Ø¯ Ù…Ø¹ Ø³Ø·ÙˆØ±Ù‡Ø§ØŒ Ù…Ø±ØªØ¨Ø© (Ø±Ù‚Ù… Ø§Ù„ØµÙØ­Ø© Ø«Ù… Ù…ÙˆØ¶Ø¹ Ø§Ù„Ø³Ø·Ø±) */
 export async function getDayPages(dateKey) {
-  return unwrap(
-    await supabase
-      .from('pages')
-      .select('*, blocks(*)')
-      .eq('page_date', dateKey)
-      .order('page_no')
-      .order('position', { referencedTable: 'blocks' })
-  );
+  try {
+    return unwrap(
+      await supabase
+        .from('pages')
+        .select('*, blocks(*)')
+        .eq('page_date', dateKey)
+        .order('page_no')
+        .order('position', { referencedTable: 'blocks' })
+    );
+  } catch (error) {
+    const pages = pagesFromSnapshot(readOfflineSnapshot());
+    if (pages) return pages.filter((page) => page.page_date === dateKey);
+    throw error;
+  }
 }
 
 export async function listAllPages() {
-  return unwrap(
-    await supabase
-      .from('pages')
-      .select('*, blocks(*)')
-      .order('page_date', { ascending: false })
-      .order('page_no')
-      .order('position', { referencedTable: 'blocks' })
-  );
+  try {
+    const pages = unwrap(
+      await supabase
+        .from('pages')
+        .select('*, blocks(*)')
+        .order('page_date', { ascending: false })
+        .order('page_no')
+        .order('position', { referencedTable: 'blocks' })
+    );
+    const cached = readOfflineSnapshot() ?? { countdowns: [] };
+    writeOfflineSnapshot({ ...cached, pages, blocks: pages.flatMap((page) => page.blocks ?? []) });
+    return pages;
+  } catch (error) {
+    const pages = pagesFromSnapshot(readOfflineSnapshot());
+    if (pages) return pages;
+    throw error;
+  }
 }
 
 /** Ø¥Ù†Ø´Ø§Ø¡ ØµÙØ­Ø© Ø¬Ø¯ÙŠØ¯Ø© Ù„ÙŠÙˆÙ… (Ø±Ù‚Ù…Ù‡Ø§ Ø§Ù„ØªØ§Ù„ÙŠ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹ Ø­Ø³Ø¨ Ø§Ù„Ù…ÙˆØ¬ÙˆØ¯) */
@@ -111,6 +128,63 @@ export async function updateBlock(id, patch) {
   return unwrap(
     await supabase.from('blocks').update(patch).eq('id', id).select().single()
   );
+}
+
+/**
+ * إخفاء السطر من الواجهات مع إبقائه قابلاً للاستعادة. الحذف الفعلي
+ * مخصص لسلة المحذوفات فقط؛ بهذه الطريقة لا تضيع كتابة اليوم بالخطأ.
+ */
+export async function trashBlock(id) {
+  return updateBlock(id, { deleted_at: new Date().toISOString() });
+}
+
+export async function restoreBlock(id) {
+  return updateBlock(id, { deleted_at: null });
+}
+
+export async function listTrashedBlocks() {
+  return unwrap(
+    await supabase
+      .from('blocks')
+      .select('*, pages(page_date, page_no, title)')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false })
+  );
+}
+
+/** تاريخ النسخة التالية لمهمة متكررة. */
+function nextRepeatDate(dateKey, rule) {
+  if (!dateKey || !rule || rule === 'none') return null;
+  const date = new Date(`${dateKey}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  if (rule === 'daily') date.setDate(date.getDate() + 1);
+  if (rule === 'weekly') date.setDate(date.getDate() + 7);
+  if (rule === 'monthly') date.setMonth(date.getMonth() + 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * إكمال مهمة، وإن كانت متكررة ينشئ النسخة التالية تلقائياً. لا نعيد
+ * استخدام المهمة نفسها حتى يظل سجل الإنجاز صادقاً وقابلاً للمراجعة.
+ */
+export async function completeBlock(block, done) {
+  const completed = await setBlockCompleted(block.id, done);
+  if (!done || !block.repeat_rule || block.repeat_rule === 'none') {
+    return { completed, repeated: null };
+  }
+
+  const dueDate = nextRepeatDate(block.due_date, block.repeat_rule);
+  if (!dueDate) return { completed, repeated: null };
+  const repeated = await createBlock({
+    page_id: block.page_id,
+    kind: 'task',
+    content: block.content,
+    position: Number(block.position || 0) + 0.01,
+    due_date: dueDate,
+    priority: block.priority || 0,
+    repeat_rule: block.repeat_rule,
+  });
+  return { completed, repeated };
 }
 
 /** ØªØ£Ø´ÙŠØ± Ø§Ù„Ø¥ÙƒÙ…Ø§Ù„ â€” Ù‚Ø§Ø¹Ø¯Ø© Ø¹Ù…Ù„: completed_at ØªÙÙ…Ù„Ø£ Ø§Ù„Ø¢Ù† Ø£Ùˆ ØªÙÙØ±ÙŽÙ‘Øº */
@@ -154,19 +228,27 @@ export async function deleteCountdown(id) {
 
 /** ÙƒØ§Ù…Ù„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ù„Ø­Ø¸Ø© Ø§Ù„Ø·Ù„Ø¨ â€” Ù„Ù„Ù†Ø³Ø® Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠ ÙˆÙ„Ù„Ù…Ù„Ø®Øµ ÙˆÙ„Ù„ØªÙ‚ÙˆÙŠÙ… ÙˆÙ„Ù„Ø·Ø¨Ø§Ø¹Ø© */
 export async function exportAll() {
-  const [pages, blocks, countdowns] = await Promise.all([
-    unwrap(await supabase.from('pages').select('*').order('page_date').order('page_no')),
-    unwrap(await supabase.from('blocks').select('*').order('position')),
-    listCountdowns(),
-  ]);
-  return {
-    app: 'kitabi',
-    version: 2,
-    exported_at: new Date().toISOString(),
-    pages,
-    blocks,
-    countdowns,
-  };
+  try {
+    const [pages, blocks, countdowns] = await Promise.all([
+      unwrap(await supabase.from('pages').select('*').order('page_date').order('page_no')),
+      unwrap(await supabase.from('blocks').select('*').order('position')),
+      listCountdowns(),
+    ]);
+    const backup = {
+      app: 'kitabi',
+      version: 2,
+      exported_at: new Date().toISOString(),
+      pages,
+      blocks,
+      countdowns,
+    };
+    writeOfflineSnapshot(backup);
+    return backup;
+  } catch (error) {
+    const cached = readOfflineSnapshot();
+    if (cached?.pages && cached?.blocks) return cached;
+    throw error;
+  }
 }
 
 /**

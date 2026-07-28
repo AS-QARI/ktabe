@@ -1,10 +1,11 @@
-import { NoteIcon, CalendarIcon, ChartIcon } from './Icons';
+import { NoteIcon, CalendarIcon, ChartIcon, SearchIcon } from './Icons';
 import './TabBar.css';
 
 const TABS = [
   { id: 'day', label: 'يومي', Icon: NoteIcon },
   { id: 'calendar', label: 'التقويم', Icon: CalendarIcon },
   { id: 'summary', label: 'الملخص', Icon: ChartIcon },
+  { id: 'search', label: 'بحث', Icon: SearchIcon },
 ];
 
 export default function TabBar({ active, onChange }) {

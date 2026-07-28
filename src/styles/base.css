@@ -146,3 +146,21 @@ textarea {
   transform: scale(0.97);
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.15);
 }
+
+/* زر التقاط ثابت: أقصر طريق من الفكرة إلى دفتر اليوم. */
+.app-capture-fab {
+  position: fixed;
+  z-index: 55;
+  inset-inline-start: var(--space-4);
+  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--space-3));
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #050506;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .36), 0 0 18px rgba(255, 255, 255, .18);
+}
+
+.app-capture-fab:active { transform: scale(.93); }
