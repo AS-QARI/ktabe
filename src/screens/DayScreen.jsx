@@ -295,15 +295,17 @@ function noteCardMeta(p, localTitle = '') {
     .sort((a, b) => a.position - b.position)
     .map((b) => contentText(b.content))
     .filter(Boolean);
-  const fallbackTitle = p.title?.trim() || localTitle.trim();
+  // العنوان المكتوب في حقله هو مصدر الحقيقة للبطاقة. أول سطر من
+  // المحتوى يُستخدم عنواناً تلقائياً فقط للملاحظات التي لم تُعنون بعد.
+  const explicitTitle = p.title?.trim() || localTitle.trim();
   const derived = rootTexts[0]
     ? rootTexts[0].length > 56
       ? `${rootTexts[0].slice(0, 56)}…`
       : rootTexts[0]
     : null;
   return {
-    title: derived || fallbackTitle || `ملاحظة ${p.page_no}`,
-    preview: (derived ? rootTexts[1] : rootTexts[0]) || '',
+    title: explicitTitle || derived || `ملاحظة ${p.page_no}`,
+    preview: (explicitTitle ? rootTexts[0] : rootTexts[1] || rootTexts[0]) || '',
     lineCount: allBlocks.length,
     taskCount: allBlocks.filter((b) => b.kind === 'task').length,
     doneCount: allBlocks.filter((b) => b.kind === 'task' && b.is_completed).length,
