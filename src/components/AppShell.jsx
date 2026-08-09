@@ -55,9 +55,12 @@ export default function AppShell() {
         <SearchScreen onOpenDay={openDay} />
       </div>
 
-      <button type="button" className="app-capture-fab" aria-label="التقاط سريع" onClick={() => setCaptureOpen(true)}>
-        <PlusIcon size={23} />
-      </button>
+      {/* شاشة يومي فيها زرّها الخاص لفتح صفحة كتابة — لا نكرّره بزر يفتح مركّب مهمة بموعد */}
+      {tab !== 'day' && (
+        <button type="button" className="app-capture-fab" aria-label="التقاط سريع" onClick={() => setCaptureOpen(true)}>
+          <PlusIcon size={23} />
+        </button>
+      )}
 
       <TabBar active={tab} onChange={setTab} />
 
