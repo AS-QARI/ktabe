@@ -196,6 +196,27 @@
   font-weight: 800;
 }
 
+/* بديل الحلقة عند الابتعاد عن اليوم — قفزة سريعة للعودة إليه */
+.day-progress-pill.jump-today {
+  background: rgba(255, 159, 10, 0.14);
+  border-color: rgba(255, 159, 10, 0.3);
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast);
+}
+
+.day-progress-pill.jump-today:active {
+  transform: scale(0.94);
+  background: rgba(255, 159, 10, 0.22);
+}
+
+.day-progress-pill.jump-today strong {
+  color: var(--checklist-accent);
+  font-size: 12px;
+}
+
+.day-progress-pill.jump-today span {
+  color: #ffd39a;
+}
+
 /* ---------- الكتاب والورقة ---------- */
 
 .book {

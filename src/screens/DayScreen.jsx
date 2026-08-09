@@ -1486,10 +1486,22 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             </button>
           ))}
         </div>
-        <div className="day-progress-pill" style={{ '--progress': `${dayProgress}%` }}>
-          <strong>{dayProgress}%</strong>
-          <span>إنجاز</span>
-        </div>
+        {isToday ? (
+          <div className="day-progress-pill" style={{ '--progress': `${dayProgress}%` }}>
+            <strong>{dayProgress}%</strong>
+            <span>إنجاز</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="day-progress-pill jump-today"
+            onClick={() => goDate(todayKey())}
+            aria-label="العودة إلى اليوم"
+          >
+            <strong>اليوم</strong>
+            <span>عودة</span>
+          </button>
+        )}
       </section>
 
       <div className="book">
