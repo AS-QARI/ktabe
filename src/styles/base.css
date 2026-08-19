@@ -10,6 +10,8 @@
 
 html {
   color-scheme: light dark;
+  /* يمنع تكبير الصفحة بالنقر المزدوج/القرص حتى لو تجاهل المتصفح وسم viewport */
+  touch-action: manipulation;
 }
 
 body {
@@ -24,6 +26,7 @@ body {
   /* إلغاء وميض اللمس الافتراضي — نستبدله بتغذية راجعة مصممة لكل عنصر */
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+  touch-action: manipulation;
 }
 
 h1, h2, h3, h4, p {
