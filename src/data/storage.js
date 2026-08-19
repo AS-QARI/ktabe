@@ -163,18 +163,40 @@ function nextRepeatDate(dateKey, rule) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+/** حالات المهمة بترتيب الدورة — نقرة الدائرة تنتقل للحالة التالية */
+export const TASK_STATUSES = ['pending', 'in_progress', 'done', 'postponed'];
+
+export const TASK_STATUS_LABELS = {
+  pending: 'لم تبدأ',
+  in_progress: 'شغال عليها',
+  done: 'مكتملة',
+  postponed: 'مؤجلة',
+};
+
+export function nextTaskStatus(status) {
+  const i = TASK_STATUSES.indexOf(status || 'pending');
+  return TASK_STATUSES[(i + 1) % TASK_STATUSES.length];
+}
+
 /**
- * إكمال مهمة، وإن كانت متكررة ينشئ النسخة التالية تلقائياً. لا نعيد
- * استخدام المهمة نفسها حتى يظل سجل الإنجاز صادقاً وقابلاً للمراجعة.
+ * ينقل مهمة لحالة جديدة. is_completed/completed_at تبقيان متزامنتين مع
+ * status = 'done' حتى لا تنكسر الفلاتر القديمة التي تعتمد عليهما. وإن
+ * أصبحت الحالة "مكتملة" لمهمة متكررة ينشئ النسخة التالية تلقائياً — لا
+ * نعيد استخدام المهمة نفسها حتى يظل سجل الإنجاز صادقاً وقابلاً للمراجعة.
  */
-export async function completeBlock(block, done) {
-  const completed = await setBlockCompleted(block.id, done);
+export async function setBlockStatus(block, status) {
+  const done = status === 'done';
+  const updated = await updateBlock(block.id, {
+    status,
+    is_completed: done,
+    completed_at: done ? new Date().toISOString() : null,
+  });
   if (!done || !block.repeat_rule || block.repeat_rule === 'none') {
-    return { completed, repeated: null };
+    return { updated, repeated: null };
   }
 
   const dueDate = nextRepeatDate(block.due_date, block.repeat_rule);
-  if (!dueDate) return { completed, repeated: null };
+  if (!dueDate) return { updated, repeated: null };
   const repeated = await createBlock({
     page_id: block.page_id,
     kind: 'task',
@@ -184,15 +206,7 @@ export async function completeBlock(block, done) {
     priority: block.priority || 0,
     repeat_rule: block.repeat_rule,
   });
-  return { completed, repeated };
-}
-
-/** ØªØ£Ø´ÙŠØ± Ø§Ù„Ø¥ÙƒÙ…Ø§Ù„ â€” Ù‚Ø§Ø¹Ø¯Ø© Ø¹Ù…Ù„: completed_at ØªÙÙ…Ù„Ø£ Ø§Ù„Ø¢Ù† Ø£Ùˆ ØªÙÙØ±ÙŽÙ‘Øº */
-export async function setBlockCompleted(id, done) {
-  return updateBlock(id, {
-    is_completed: done,
-    completed_at: done ? new Date().toISOString() : null,
-  });
+  return { updated, repeated };
 }
 
 export async function deleteBlock(id) {

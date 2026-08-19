@@ -882,6 +882,22 @@
   100% { transform: scale(1); }
 }
 
+/* شغال عليها: نصف الدائرة ممتلئ — بين البداية والإنجاز */
+.status-in_progress .line-circle {
+  background: linear-gradient(90deg, var(--checklist-accent) 50%, transparent 50%);
+  border-color: var(--checklist-accent);
+}
+
+/* مؤجلة: دائرة باهتة مع سهمين — أقل إلحاحاً من بقية المهام */
+.status-postponed .line-circle {
+  border-color: var(--label-tertiary);
+  color: var(--label-secondary);
+}
+
+.status-postponed .line-input {
+  color: var(--label-secondary);
+}
+
 /* هدف التعشيش (إفلات على منتصف مهمة): كبسولة متقطعة حول السطر كله
    وتوهج حول دائرته — «أفلت هنا لتصبح فرعية» */
 .paper-line.subtask-drop-target::after {

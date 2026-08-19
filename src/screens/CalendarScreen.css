@@ -585,6 +585,22 @@
   border-color: #fff;
 }
 
+/* شغال عليها: نصف الدائرة ممتلئ */
+.task-preview-row.status-in_progress .task-preview-check {
+  background: linear-gradient(90deg, #fff 50%, transparent 50%);
+  border-color: #fff;
+}
+
+/* مؤجلة: دائرة باهتة مع سهمين */
+.task-preview-row.status-postponed .task-preview-check {
+  color: rgba(255, 255, 255, 0.6);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.task-preview-row.status-postponed {
+  opacity: 0.72;
+}
+
 .task-preview-text {
   min-width: 0;
   display: flex;

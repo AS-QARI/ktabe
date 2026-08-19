@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const MOCKS =
-  '/private/tmp/claude-501/-Users-zxs-GitHub-ktabe/b16767a7-bd21-4ab8-80c3-ccbc3ac9e7af/scratchpad/mocks';
+  '/private/tmp/claude-501/-Users-zxs-GitHub-ktabe/574117af-11d9-4bb6-826d-8a4b1aa71a14/scratchpad/mocks';
 
 export default defineConfig({
   plugins: [react()],

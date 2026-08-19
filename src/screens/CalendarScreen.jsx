@@ -1,7 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import {
   exportAll,
-  completeBlock,
+  setBlockStatus,
+  nextTaskStatus,
+  TASK_STATUS_LABELS,
   createCountdown,
   deleteCountdown,
   createPage,
@@ -26,6 +28,7 @@ import {
   GearIcon,
   PlusIcon,
   CheckIcon,
+  PostponedIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CalendarIcon,
@@ -312,25 +315,28 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
 
   /* ---------- الإجراءات ---------- */
 
-  /** إكمال/إلغاء إكمال مهمة — تحديث متفائل */
-  const toggleBlock = (block) => {
+  /** ينقل مهمة لحالة محددة — تحديث متفائل */
+  const applyBlockStatus = (block, status) => {
     navigator.vibrate?.(10);
-    const done = !block.is_completed;
+    const done = status === 'done';
     live.setData((d) => ({
       ...d,
       blocks: d.blocks.map((b) =>
         b.id === block.id
-          ? { ...b, is_completed: done, completed_at: done ? new Date().toISOString() : null }
+          ? { ...b, status, is_completed: done, completed_at: done ? new Date().toISOString() : null }
           : b
       ),
     }));
-    completeBlock(block, done)
+    setBlockStatus(block, status)
       .then(({ repeated }) => {
         if (!repeated) return;
         live.setData((d) => ({ ...d, blocks: [...d.blocks, repeated] }));
       })
       .catch(() => live.reload());
   };
+
+  /** نقرة الدائرة: تدور بين حالات المهمة، كما في صفحة اليوم */
+  const cycleBlockStatus = (block) => applyBlockStatus(block, nextTaskStatus(block.status));
 
   /** صفحة يوم محدد — الأولى إن تعددت، وتُنشأ إن لم توجد */
   const ensurePageFor = async (dateKey) => {
@@ -519,7 +525,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                     task={task}
                     meta={overdueAgeLabel(task.date, today)}
                     subCount={openSubCount.get(task.id) ?? 0}
-                    onToggle={() => toggleBlock(task)}
+                    onToggle={() => cycleBlockStatus(task)}
                     onOpen={() => openDayAt(task.date)}
                     action={
                       <button
@@ -552,7 +558,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                     key={task.id}
                     task={task}
                     subCount={openSubCount.get(task.id) ?? 0}
-                    onToggle={() => toggleBlock(task)}
+                    onToggle={() => cycleBlockStatus(task)}
                     onOpen={() => openDayAt(today)}
                   />
                 )}
@@ -572,7 +578,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                     task={task}
                     meta={upcomingGroupLabel(task.date, today)}
                     subCount={openSubCount.get(task.id) ?? 0}
-                    onToggle={() => toggleBlock(task)}
+                    onToggle={() => cycleBlockStatus(task)}
                     onOpen={() => openDayAt(task.date)}
                   />
                 )}
@@ -609,7 +615,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                       : undefined
                 }
                 subCount={openSubCount.get(task.id) ?? 0}
-                onToggle={() => toggleBlock(task)}
+                onToggle={() => cycleBlockStatus(task)}
                 onOpen={() => openDayAt(task.date)}
                 action={
                   taskSheet?.type === 'overdue' ? (
@@ -652,7 +658,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                     <TaskHistoryRow
                       key={task.id}
                       task={task}
-                      onToggle={() => toggleBlock(task)}
+                      onToggle={() => applyBlockStatus(task, 'pending')}
                       onOpen={() => openDayAt(task.date)}
                     />
                   ))}
@@ -803,26 +809,29 @@ function TaskPreviewSection({ tone, title, count, subtitle, tasks, empty, onMore
 }
 
 function TaskPreviewRow({ task, subCount, meta, onToggle, onOpen, action }) {
+  const status = task.status || 'pending';
+  const showStatusLabel = status === 'in_progress' || status === 'postponed';
   return (
-    <div className={`task-preview-row${task.is_completed ? ' done' : ''}`}>
+    <div className={`task-preview-row${task.is_completed ? ' done' : ''} status-${status}`}>
       <button
         type="button"
         className="task-preview-check"
-        role="checkbox"
-        aria-checked={task.is_completed}
-        aria-label={task.is_completed ? 'إلغاء الإكمال' : 'إكمال المهمة'}
+        aria-label={`${TASK_STATUS_LABELS[status]} — اضغط للانتقال إلى ${TASK_STATUS_LABELS[nextTaskStatus(status)]}`}
         onClick={onToggle}
       >
-        <CheckIcon size={12} />
+        {status === 'done' && <CheckIcon size={12} />}
+        {status === 'postponed' && <PostponedIcon size={11} />}
       </button>
       <button type="button" className="task-preview-text" onClick={onOpen}>
         <span className="task-preview-title">{plainContent(task.content) || 'مهمة بلا نص'}</span>
-        {(meta || subCount > 0 || task.repeat_rule !== 'none' || task.priority > 1) && (
+        {(meta || subCount > 0 || showStatusLabel || task.repeat_rule !== 'none' || task.priority > 1) && (
           <span className="task-preview-meta">
             {meta}
             {meta && subCount > 0 ? ' · ' : ''}
             {subCount > 0 ? `${subCount} فرعية` : ''}
-            {(meta || subCount > 0) && (task.repeat_rule !== 'none' || task.priority > 1) ? ' · ' : ''}
+            {(meta || subCount > 0) && showStatusLabel ? ' · ' : ''}
+            {showStatusLabel ? TASK_STATUS_LABELS[status] : ''}
+            {(meta || subCount > 0 || showStatusLabel) && (task.repeat_rule !== 'none' || task.priority > 1) ? ' · ' : ''}
             {task.repeat_rule !== 'none' ? 'متكررة' : ''}
             {task.repeat_rule !== 'none' && task.priority > 1 ? ' · ' : ''}
             {task.priority === 3 ? 'عاجلة' : task.priority === 2 ? 'مهمة' : ''}

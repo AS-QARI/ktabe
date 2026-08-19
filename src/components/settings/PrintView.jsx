@@ -2,6 +2,12 @@ import { createPortal } from 'react-dom';
 import { formatDateWithYear, formatWeekday, parseDateKey } from '../../utils/dates';
 import './print.css';
 
+const TASK_GLYPH = { pending: '☐', in_progress: '◐', done: '☑', postponed: '⏭' };
+
+function taskGlyph(block) {
+  return `${TASK_GLYPH[block.status || 'pending'] ?? '☐'} `;
+}
+
 /**
  * نسخة الطباعة — تُركّب خارج شجرة التطبيق (Portal) وتظهر فقط في وضع
  * الطباعة. نستخدم حوار طباعة المتصفح نفسه ("حفظ كـ PDF"): تشكيل عربي
@@ -44,13 +50,13 @@ export default function PrintView({ data }) {
                       .sort((a, b) => a.position - b.position);
                     return (
                       <li key={r.id} className={r.kind === 'task' ? 'print-task' : ''}>
-                        {r.kind === 'task' ? (r.is_completed ? '☑ ' : '☐ ') : ''}
+                        {r.kind === 'task' ? taskGlyph(r) : ''}
                         {r.content}
                         {kids.length > 0 && (
                           <ul className="print-lines sub">
                             {kids.map((k) => (
                               <li key={k.id} className={k.kind === 'task' ? 'print-task' : ''}>
-                                {k.kind === 'task' ? (k.is_completed ? '☑ ' : '☐ ') : ''}
+                                {k.kind === 'task' ? taskGlyph(k) : ''}
                                 {k.content}
                               </li>
                             ))}

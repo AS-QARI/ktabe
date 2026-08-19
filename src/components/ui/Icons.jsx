@@ -264,6 +264,16 @@ export function TaskCircleIcon(props) {
   );
 }
 
+/** سهمان للأمام — تأجيل مهمة */
+export function PostponedIcon(props) {
+  return (
+    <Svg strokeWidth={2.2} {...props}>
+      <path d="m7 5.5 5.5 6.5-5.5 6.5" />
+      <path d="m13 5.5 5.5 6.5-5.5 6.5" />
+    </Svg>
+  );
+}
+
 /** إزاحة لسطر فرعي (مهمة جانبية/تعليق) */
 export function IndentIcon(props) {
   return (

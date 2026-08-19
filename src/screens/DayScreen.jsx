@@ -6,7 +6,9 @@ import {
   updatePage,
   createBlock,
   updateBlock,
-  completeBlock,
+  setBlockStatus,
+  nextTaskStatus,
+  TASK_STATUS_LABELS,
   trashBlock,
   onTablesChange,
 } from '../data/storage';
@@ -23,6 +25,7 @@ import {
   CalendarIcon,
   TrashIcon,
   CheckIcon,
+  PostponedIcon,
   TaskCircleIcon,
   IndentIcon,
   OutdentIcon,
@@ -852,25 +855,26 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     setPendingFocus(prev.block.id);
   };
 
-  const toggleComplete = (block) => {
+  const cycleTaskStatus = (block) => {
     markEdit();
     navigator.vibrate?.(10);
-    const done = !block.is_completed;
+    const status = nextTaskStatus(block.status);
+    const done = status === 'done';
     const completedAt = done ? new Date().toISOString() : null;
     mutate((bs) =>
       bs.map((b) =>
         b.id === block.id
-          ? { ...b, is_completed: done, completed_at: completedAt }
+          ? { ...b, status, is_completed: done, completed_at: completedAt }
           : b
       )
     );
     touchPageInAllPages(block.page_id, (p) => ({
       ...p,
       blocks: (p.blocks ?? []).map((b) =>
-        b.id === block.id ? { ...b, is_completed: done, completed_at: completedAt } : b
+        b.id === block.id ? { ...b, status, is_completed: done, completed_at: completedAt } : b
       ),
     }));
-    completeBlock(block, done)
+    setBlockStatus(block, status)
       .then(({ repeated }) => {
         if (repeated) {
           mutate((bs) => [...bs, repeated]);
@@ -887,8 +891,8 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     navigator.vibrate?.(8);
 	    const patch =
 	      block.kind === 'text'
-	        ? { kind: 'task' }
-	        : { kind: 'text', is_completed: false, completed_at: null };
+	        ? { kind: 'task', status: 'pending' }
+	        : { kind: 'text', status: 'pending', is_completed: false, completed_at: null };
 	    mutate((bs) => bs.map((b) => (b.id === block.id ? { ...b, ...patch } : b)));
     touchPageInAllPages(block.page_id, (p) => ({
       ...p,
@@ -1681,7 +1685,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
                     onChange={editContent}
                     onKeyDown={onKeyDown}
                     onPaste={handlePaste}
-                    onToggle={toggleComplete}
+                    onToggle={cycleTaskStatus}
                     onFocus={setFocusedId}
                     onBlur={() =>
                       setTimeout(
@@ -1927,6 +1931,7 @@ function PaperLine({
 }) {
   const { block, depth } = row;
   const isTask = block.kind === 'task';
+  const status = block.status || 'pending';
   const isEmpty = isEmptyContent(block.content);
   const bold = isBold(block.content);
   const longPressTimer = useRef(null);
@@ -1989,6 +1994,7 @@ function PaperLine({
         isTask ? 'is-task' : '',
         isEmpty && !isFocused && !isTask ? 'is-empty' : '',
         isTask && block.is_completed ? 'done' : '',
+        isTask ? `status-${status}` : '',
         bold ? 'is-bold' : '',
         isNestTarget ? 'subtask-drop-target' : '',
         dragging ? 'dragging' : '',
@@ -2019,9 +2025,7 @@ function PaperLine({
           <button
             type="button"
             className="line-circle"
-            role="checkbox"
-            aria-checked={block.is_completed}
-            aria-label={block.is_completed ? 'إلغاء الإكمال' : 'إكمال المهمة'}
+            aria-label={`${TASK_STATUS_LABELS[status]} — اضغط للانتقال إلى ${TASK_STATUS_LABELS[nextTaskStatus(status)]}`}
             onPointerDown={(e) => {
               if (selectMode || anyDragging) return;
               if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -2103,7 +2107,8 @@ function PaperLine({
               onToggle(block);
             }}
           >
-            <CheckIcon size={13} />
+            {status === 'done' && <CheckIcon size={13} />}
+            {status === 'postponed' && <PostponedIcon size={12} />}
           </button>
         ) : (
           /* لا دائرة شبحية — الورقة نظيفة */
