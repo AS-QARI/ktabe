@@ -10,10 +10,10 @@
   max-height: calc(100dvh - var(--tabbar-height) - var(--safe-bottom));
   overflow: hidden;
   padding: calc(var(--safe-top) + var(--space-2)) var(--space-4) var(--space-3);
-  --calendar-warm: #ff9f0a;
-  --calendar-warm-2: #e7ad52;
-  --calendar-warm-soft: #ffd39a;
-  --calendar-warm-glow: rgba(255, 159, 10, 0.12);
+  --calendar-warm: #d09a55;
+  --calendar-warm-2: #c18b49;
+  --calendar-warm-soft: #eeeeee;
+  --calendar-warm-glow: rgba(208, 154, 85, 0.07);
   --calendar-honey-glass: rgba(255, 159, 10, 0.055);
 }
 
@@ -88,8 +88,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
+
+.calendar-dashboard::-webkit-scrollbar { display: none; }
 
 .calendar-screen .error-banner {
   position: absolute;
@@ -100,26 +104,36 @@
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
 }
 
-/* ---------- صف العدّادات التنازلية (كلها ظاهرة، تمرير أفقي) ---------- */
+/* ---------- قسم العدّادات التنازلية — كل العدّادات ظاهرة قبل المهام ---------- */
 
 .countdown-strip {
   flex: 0 0 auto;
   min-height: 0;
-  /* سقف يمنع العدّادات من ابتلاع مساحة المهام — تُظهر ~3 ثم تتمرّر داخلياً */
-  max-height: 240px;
+  max-height: none;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
   padding-inline-end: 2px;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
 }
 
-.countdown-strip::-webkit-scrollbar {
-  display: none;
+.calendar-tasks-toggle {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border: 1px solid rgba(208, 154, 85, 0.28);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.065);
+  color: #f4f4f4;
+  font-size: 13px;
+  font-weight: 800;
 }
+
+.calendar-tasks-toggle svg { transform: rotate(90deg); transition: transform var(--dur-fast); }
+.calendar-tasks-toggle.active svg { transform: rotate(-90deg); }
 
 .countdown-chip {
   flex: 0 0 auto;
@@ -160,7 +174,7 @@
 .countdown-chip-date {
   font-size: 11px;
   font-weight: 700;
-  color: var(--calendar-warm-soft);
+  color: var(--calendar-warm-2);
 }
 
 .countdown-chip-days {
@@ -190,7 +204,7 @@
 }
 
 .countdown-chip.now {
-  border-color: rgba(255, 159, 10, 0.5);
+  border-color: rgba(208, 154, 85, 0.36);
 }
 
 .countdown-chip.now .countdown-chip-days strong {
@@ -198,8 +212,15 @@
 }
 
 .countdown-chip.past {
-  opacity: 0.6;
+  opacity: 1;
+  border-color: rgba(208, 154, 85, 0.28);
+  background:
+    radial-gradient(circle at 0 0, rgba(208, 154, 85, 0.08), transparent 38%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025));
 }
+
+.countdown-chip.past .countdown-chip-title { color: #fff; }
+.countdown-chip.past .countdown-chip-days { background: rgba(255, 255, 255, 0.1); }
 
 .countdown-chip-add {
   min-height: 40px;
@@ -638,6 +659,33 @@
   font-size: 12px;
   font-weight: 800;
 }
+
+.countdown-delete-btn {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 10px;
+  border-radius: 12px;
+  background: rgba(255, 69, 58, 0.12);
+  color: #ff8178;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.task-overdue-countdown {
+  min-width: 42px;
+  min-height: 34px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(255, 116, 106, 0.12);
+  color: #ff938b;
+  line-height: 1;
+}
+
+.task-overdue-countdown strong { font-size: 16px; font-weight: 850; }
+.task-overdue-countdown small { margin-top: 3px; font-size: 9px; font-weight: 750; }
 
 /* ---------- سجل المهام المكتملة ---------- */
 

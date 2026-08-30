@@ -1,6 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
 import { hasPin } from './data/storage';
-import { supabaseConfigError } from './lib/supabaseClient';
 import { isUnlocked, saveUnlock } from './lib/session';
 import PinScreen from './screens/PinScreen';
 import AppShell from './components/AppShell';
@@ -23,21 +22,17 @@ function withTimeout(promise, ms, message) {
  *  unlocked: الجلسة مفتوحة (محفوظة محلياً من زيارة سابقة أو بعد إدخال صحيح)
  */
 export default function App() {
-  const [gate, setGate] = useState(() => (supabaseConfigError ? 'checking' : isUnlocked() ? 'unlocked' : 'checking'));
+  const [gate, setGate] = useState(() => (isUnlocked() ? 'unlocked' : 'checking'));
   const [loadError, setLoadError] = useState(null);
   const previewFrame = readPreviewFrame() === 'iphone';
 
   useEffect(() => {
     if (gate !== 'checking') return;
-    if (supabaseConfigError) {
-      setLoadError(supabaseConfigError);
-      return;
-    }
     let cancelled = false;
     withTimeout(
       hasPin(),
       10000,
-      'انتهت مهلة الاتصال بـ Supabase. تأكد من رابط المشروع والمفتاح ومن أن GitHub Pages يستخدم النسخة الجديدة.'
+      'استغرق فتح التخزين المحلي وقتًا أطول من المتوقع. أغلق نوافذ التطبيق الأخرى ثم حاول مجددًا.'
     )
       .then((exists) => {
         if (!cancelled) setGate(exists ? 'locked' : 'setup');
@@ -60,7 +55,7 @@ export default function App() {
   if (loadError) {
     content = (
       <div className="error-state">
-        <h2>تعذّر الاتصال</h2>
+        <h2>تعذّر فتح التخزين</h2>
         <p>{loadError}</p>
         <button
           type="button"
@@ -97,7 +92,6 @@ export default function App() {
 
   return <DeviceFrame enabled={previewFrame}>{content}</DeviceFrame>;
 }
-
 
 
 

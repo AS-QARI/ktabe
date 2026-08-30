@@ -11,7 +11,7 @@ function showFatalError(error) {
     <main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:#050506;color:#fff;font-family:Tahoma,sans-serif;direction:rtl;text-align:center">
       <section style="max-width:520px">
         <h1 style="font-size:24px;margin:0 0 12px">تعذر تشغيل التطبيق</h1>
-        <p style="margin:0 0 16px;color:rgba(255,255,255,.72)">غالبا المشكلة من إعدادات Supabase أو من نسخة النشر.</p>
+        <p style="margin:0 0 16px;color:rgba(255,255,255,.72)">حدثت مشكلة أثناء فتح بيانات التطبيق المحلية.</p>
         <pre style="white-space:pre-wrap;text-align:left;direction:ltr;background:rgba(255,255,255,.08);padding:12px;border-radius:10px;color:#fff">${message}</pre>
       </section>
     </main>
@@ -22,6 +22,18 @@ window.addEventListener('error', (event) => showFatalError(event.error || event.
 window.addEventListener('unhandledrejection', (event) => showFatalError(event.reason));
 
 try {
+  // Safari قد يتجاهل user-scalable=no. نلغي إيماءات القرص والتكبير المزدوج
+  // ليبقى الـ PWA ثابتاً كتطبيق، مع إبقاء تمرير المحتوى الداخلي طبيعياً.
+  document.addEventListener('gesturestart', (event) => event.preventDefault(), { passive: false });
+  let lastTouchEnd = 0;
+  let lastTouchTarget = null;
+  document.addEventListener('touchend', (event) => {
+    const now = Date.now();
+    if (now - lastTouchEnd < 300 && event.target === lastTouchTarget) event.preventDefault();
+    lastTouchEnd = now;
+    lastTouchTarget = event.target;
+  }, { passive: false });
+
   if (import.meta.env.DEV && window.location.hash.includes('dev-unlock')) {
     saveUnlock();
   }

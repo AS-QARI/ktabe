@@ -1,141 +1,296 @@
-﻿import { supabase } from '../lib/supabaseClient';
+import { readOfflineSnapshot } from '../lib/offlineCache';
 
-import { pagesFromSnapshot, readOfflineSnapshot, writeOfflineSnapshot } from '../lib/offlineCache';
+/*
+ * طبقة البيانات المحلية لكتابي.
+ * كل شيء يُحفظ داخل IndexedDB في هذا المتصفح فقط؛ لا توجد شبكة أو حسابات
+ * أو مزامنة خارجية. بقيت الواجهة البرمجية Async حتى لا تحتاج الشاشات لأي
+ * تغيير، وحتى يظل العمل سلساً لو كبرت اليوميات مع الوقت.
+ */
 
-/* =====================================================================
-   Ø·Ø¨Ù‚Ø© Ø§Ù„ÙˆØµÙˆÙ„ Ù„Ù„Ø¨ÙŠØ§Ù†Ø§Øª (Data Access Layer)
-   ---------------------------------------------------------------------
-   ÙƒÙ„ Ù‚Ø±Ø§Ø¡Ø© Ø£Ùˆ ÙƒØªØ§Ø¨Ø© Ù„Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª ÙÙŠ Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ ÙƒÙ„Ù‡ ØªÙ…Ø± Ù…Ù† Ù‡Ø°Ø§ Ø§Ù„Ù…Ù„Ù
-   Ø­ØµØ±ÙŠØ§Ù‹. Ù„Ø§ ÙŠØ³ØªÙˆØ±Ø¯ Ø£ÙŠ Ù…ÙƒÙˆÙ‘Ù† supabaseClient Ù…Ø¨Ø§Ø´Ø±Ø© â€” Ù„Ùˆ ØªØºÙŠÙ‘Ø± Ù…Ø²ÙˆÙ‘Ø¯
-   Ø§Ù„ØªØ®Ø²ÙŠÙ† Ù…Ø³ØªÙ‚Ø¨Ù„Ø§Ù‹ØŒ Ù‡Ø°Ø§ Ù‡Ùˆ Ø§Ù„Ù…Ù„Ù Ø§Ù„ÙˆØ­ÙŠØ¯ Ø§Ù„Ø°ÙŠ ÙŠÙØ¹Ø¯ÙŽÙ‘Ù„.
+const DB_NAME = 'kitabi-local';
+const DB_VERSION = 1;
+const localEvents = new EventTarget();
+const channel = typeof BroadcastChannel !== 'undefined'
+  ? new BroadcastChannel('kitabi-local-changes')
+  : null;
 
-   Ù†Ù…ÙˆØ°Ø¬ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª (Ù†Ù…ÙˆØ°Ø¬ "Ø§Ù„Ø¯ÙØªØ±"):
-   - pages: ÙˆØ±Ù‚Ø© Ù„ÙŠÙˆÙ… Ù…Ø­Ø¯Ø¯ (page_date) â€” ÙˆØ§Ù„ÙŠÙˆÙ… Ø§Ù„ÙˆØ§Ø­Ø¯ Ù‚Ø¯ ÙŠÙ…Ù„Ùƒ Ø£ÙƒØ«Ø±
-     Ù…Ù† ØµÙØ­Ø© (page_no: 1ØŒ 2ØŒ ...)
-   - blocks: Ø³Ø·ÙˆØ± Ø§Ù„ØµÙØ­Ø© â€” Ù†Øµ Ø­Ø± Ø£Ùˆ Ù…Ù‡Ù…Ø© (kind)ØŒ ÙˆÙ‚Ø¯ ÙŠÙƒÙˆÙ† Ø§Ù„Ø³Ø·Ø±
-     ÙØ±Ø¹ÙŠØ§Ù‹ ØªØ­Øª Ù…Ù‡Ù…Ø© (parent_id) ÙƒÙ…Ù‡Ù…Ø© Ø¬Ø§Ù†Ø¨ÙŠØ© Ø£Ùˆ ØªØ¹Ù„ÙŠÙ‚
-   - countdowns: Ø§Ù„Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„ØªÙ†Ø§Ø²Ù„ÙŠØ©
-   - app_settings: Ø±Ù…Ø² Ø§Ù„Ø¯Ø®ÙˆÙ„ (Ø¹Ø¨Ø± Ø¯ÙˆØ§Ù„ RPC ÙÙ‚Ø·)
-   ===================================================================== */
+let databasePromise;
+let migrationPromise;
 
-/** ÙŠÙÙƒÙ‘ Ù†ØªÙŠØ¬Ø© Supabase: ÙŠØ±Ù…ÙŠ Ø®Ø·Ø£Ù‹ ÙˆØ§Ø¶Ø­Ø§Ù‹ Ø£Ùˆ ÙŠØ¹ÙŠØ¯ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª */
-function unwrap({ data, error }) {
-  if (error) {
-    throw new Error(error.message);
-  }
-  return data;
+function requestResult(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('تعذّر الوصول إلى التخزين المحلي'));
+  });
 }
 
-/* ---------------------------------------------------------------------
-   1. Ø±Ù…Ø² Ø§Ù„Ø¯Ø®ÙˆÙ„ (PIN)
-   Ø§Ù„ØªØ­Ù‚Ù‚ ÙŠØªÙ… Ø¯Ø§Ø®Ù„ Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø¹Ø¨Ø± Ø¯ÙˆØ§Ù„ RPC â€” Ø§Ù„Ù€ hash Ù„Ø§ ÙŠØµÙ„
-   Ù„Ù„Ù…ØªØµÙØ­ Ø£Ø¨Ø¯Ø§Ù‹ØŒ ÙˆØ§Ù„Ù…Ù‚Ø§Ø±Ù†Ø© ØªØ¬Ø±ÙŠ Ø¨Ù€ bcrypt Ø¹Ù„Ù‰ Ø§Ù„Ø®Ø§Ø¯Ù….
-   --------------------------------------------------------------------- */
+function transactionDone(transaction) {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error('تعذّر حفظ البيانات محلياً'));
+    transaction.onabort = () => reject(transaction.error || new Error('أُلغيت عملية الحفظ المحلية'));
+  });
+}
+
+function openDatabase() {
+  if (databasePromise) return databasePromise;
+  databasePromise = new Promise((resolve, reject) => {
+    const open = indexedDB.open(DB_NAME, DB_VERSION);
+    open.onupgradeneeded = () => {
+      const db = open.result;
+      if (!db.objectStoreNames.contains('pages')) {
+        const pages = db.createObjectStore('pages', { keyPath: 'id' });
+        pages.createIndex('page_date', 'page_date');
+      }
+      if (!db.objectStoreNames.contains('blocks')) {
+        const blocks = db.createObjectStore('blocks', { keyPath: 'id' });
+        blocks.createIndex('page_id', 'page_id');
+        blocks.createIndex('due_date', 'due_date');
+      }
+      if (!db.objectStoreNames.contains('countdowns')) {
+        db.createObjectStore('countdowns', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('settings')) {
+        db.createObjectStore('settings', { keyPath: 'key' });
+      }
+    };
+    open.onsuccess = () => resolve(open.result);
+    open.onerror = () => reject(open.error || new Error('تعذّر فتح التخزين المحلي'));
+    open.onblocked = () => reject(new Error('أغلق نوافذ كتابي القديمة ثم أعد المحاولة'));
+  });
+  return databasePromise;
+}
+
+async function getRaw(storeName, key) {
+  const db = await openDatabase();
+  return requestResult(db.transaction(storeName).objectStore(storeName).get(key));
+}
+
+async function getAllRaw(storeName) {
+  const db = await openDatabase();
+  return requestResult(db.transaction(storeName).objectStore(storeName).getAll());
+}
+
+async function putRaw(storeName, value) {
+  const db = await openDatabase();
+  const tx = db.transaction(storeName, 'readwrite');
+  tx.objectStore(storeName).put(value);
+  await transactionDone(tx);
+  return value;
+}
+
+async function deleteRaw(storeName, key) {
+  const db = await openDatabase();
+  const tx = db.transaction(storeName, 'readwrite');
+  tx.objectStore(storeName).delete(key);
+  await transactionDone(tx);
+}
+
+function makeId() {
+  return crypto.randomUUID?.() ?? `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function announce(table) {
+  localEvents.dispatchEvent(new CustomEvent('change', { detail: table }));
+  channel?.postMessage(table);
+}
+
+channel?.addEventListener('message', (event) => {
+  localEvents.dispatchEvent(new CustomEvent('change', { detail: event.data }));
+});
+
+/** يستورد آخر لقطة محلية من النسخة القديمة مرة واحدة، بلا اتصال خارجي. */
+async function migrateLegacySnapshot() {
+  if (migrationPromise) return migrationPromise;
+  migrationPromise = (async () => {
+    const migrated = await getRaw('settings', 'legacy-snapshot-migrated');
+    if (migrated) return;
+
+    const [existingPages, existingBlocks] = await Promise.all([
+      getAllRaw('pages'),
+      getAllRaw('blocks'),
+    ]);
+    const snapshot = readOfflineSnapshot();
+    if (existingPages.length === 0 && existingBlocks.length === 0 && snapshot?.pages && snapshot?.blocks) {
+      const db = await openDatabase();
+      const tx = db.transaction(['pages', 'blocks', 'countdowns'], 'readwrite');
+      const pagesStore = tx.objectStore('pages');
+      const blocksStore = tx.objectStore('blocks');
+      const countdownsStore = tx.objectStore('countdowns');
+      snapshot.pages.forEach((page) => {
+        const { blocks: _embeddedBlocks, ...cleanPage } = page;
+        pagesStore.put(cleanPage);
+      });
+      snapshot.blocks.forEach((block) => blocksStore.put(block));
+      (snapshot.countdowns ?? []).forEach((countdown) => countdownsStore.put(countdown));
+      await transactionDone(tx);
+    }
+    await putRaw('settings', { key: 'legacy-snapshot-migrated', value: true, updated_at: nowIso() });
+  })();
+  return migrationPromise;
+}
+
+async function ready() {
+  await openDatabase();
+  await migrateLegacySnapshot();
+}
+
+async function hashPin(pin, salt) {
+  const bytes = new TextEncoder().encode(`${salt}:${pin}`);
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function validPin(pin) {
+  return /^\d{4,6}$/.test(pin || '');
+}
+
+function randomSalt() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 export async function hasPin() {
-  return unwrap(await supabase.rpc('has_pin'));
+  await ready();
+  return Boolean(await getRaw('settings', 'pin'));
 }
 
 export async function setupPin(pin) {
-  return unwrap(await supabase.rpc('setup_pin', { p_pin: pin }));
+  await ready();
+  if (!validPin(pin) || await getRaw('settings', 'pin')) return false;
+  const salt = randomSalt();
+  await putRaw('settings', { key: 'pin', salt, hash: await hashPin(pin, salt), updated_at: nowIso() });
+  announce('settings');
+  return true;
 }
 
 export async function verifyPin(pin) {
-  return unwrap(await supabase.rpc('verify_pin', { p_pin: pin }));
+  await ready();
+  const saved = await getRaw('settings', 'pin');
+  if (!saved || !validPin(pin)) return false;
+  const matches = (await hashPin(pin, saved.salt)) === saved.hash;
+  if (!matches) await new Promise((resolve) => window.setTimeout(resolve, 300));
+  return matches;
 }
 
 export async function changePin(oldPin, newPin) {
-  return unwrap(
-    await supabase.rpc('change_pin', { p_old_pin: oldPin, p_new_pin: newPin })
-  );
+  if (!validPin(newPin) || !(await verifyPin(oldPin))) return false;
+  const salt = randomSalt();
+  await putRaw('settings', { key: 'pin', salt, hash: await hashPin(newPin, salt), updated_at: nowIso() });
+  announce('settings');
+  return true;
 }
 
-/* ---------------------------------------------------------------------
-   2. Ø§Ù„ØµÙØ­Ø§Øª Ø§Ù„ÙŠÙˆÙ…ÙŠØ©
-   --------------------------------------------------------------------- */
-
-/** ØµÙØ­Ø§Øª ÙŠÙˆÙ… Ù…Ø­Ø¯Ø¯ Ù…Ø¹ Ø³Ø·ÙˆØ±Ù‡Ø§ØŒ Ù…Ø±ØªØ¨Ø© (Ø±Ù‚Ù… Ø§Ù„ØµÙØ­Ø© Ø«Ù… Ù…ÙˆØ¶Ø¹ Ø§Ù„Ø³Ø·Ø±) */
-export async function getDayPages(dateKey) {
-  try {
-    return unwrap(
-      await supabase
-        .from('pages')
-        .select('*, blocks(*)')
-        .eq('page_date', dateKey)
-        .order('page_no')
-        .order('position', { referencedTable: 'blocks' })
-    );
-  } catch (error) {
-    const pages = pagesFromSnapshot(readOfflineSnapshot());
-    if (pages) return pages.filter((page) => page.page_date === dateKey);
-    throw error;
+async function pagesWithBlocks() {
+  await ready();
+  const [pages, blocks] = await Promise.all([getAllRaw('pages'), getAllRaw('blocks')]);
+  const byPage = new Map();
+  for (const block of blocks) {
+    if (!byPage.has(block.page_id)) byPage.set(block.page_id, []);
+    byPage.get(block.page_id).push(block);
   }
+  return pages.map((page) => ({
+    ...page,
+    blocks: (byPage.get(page.id) ?? []).sort((a, b) => Number(a.position || 0) - Number(b.position || 0)),
+  }));
+}
+
+export async function getDayPages(dateKey) {
+  return (await pagesWithBlocks())
+    .filter((page) => page.page_date === dateKey)
+    .sort((a, b) => Number(a.page_no || 0) - Number(b.page_no || 0));
 }
 
 export async function listAllPages() {
-  try {
-    const pages = unwrap(
-      await supabase
-        .from('pages')
-        .select('*, blocks(*)')
-        .order('page_date', { ascending: false })
-        .order('page_no')
-        .order('position', { referencedTable: 'blocks' })
-    );
-    const cached = readOfflineSnapshot() ?? { countdowns: [] };
-    writeOfflineSnapshot({ ...cached, pages, blocks: pages.flatMap((page) => page.blocks ?? []) });
-    return pages;
-  } catch (error) {
-    const pages = pagesFromSnapshot(readOfflineSnapshot());
-    if (pages) return pages;
-    throw error;
-  }
+  return (await pagesWithBlocks()).sort((a, b) =>
+    b.page_date.localeCompare(a.page_date) || Number(a.page_no || 0) - Number(b.page_no || 0)
+  );
 }
 
-/** Ø¥Ù†Ø´Ø§Ø¡ ØµÙØ­Ø© Ø¬Ø¯ÙŠØ¯Ø© Ù„ÙŠÙˆÙ… (Ø±Ù‚Ù…Ù‡Ø§ Ø§Ù„ØªØ§Ù„ÙŠ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹ Ø­Ø³Ø¨ Ø§Ù„Ù…ÙˆØ¬ÙˆØ¯) */
 export async function createPage(dateKey, pageNo) {
-  return unwrap(
-    await supabase
-      .from('pages')
-      .insert({ page_date: dateKey, page_no: pageNo })
-      .select()
-      .single()
-  );
+  await ready();
+  const stamp = nowIso();
+  const page = {
+    id: makeId(),
+    page_date: dateKey,
+    page_no: pageNo,
+    title: '',
+    text_size: 'md',
+    is_pinned: false,
+    pinned_at: null,
+    created_at: stamp,
+    updated_at: stamp,
+  };
+  await putRaw('pages', page);
+  announce('pages');
+  return page;
 }
 
 export async function updatePage(id, patch) {
-  return unwrap(
-    await supabase.from('pages').update(patch).eq('id', id).select().single()
-  );
+  await ready();
+  const page = await getRaw('pages', id);
+  if (!page) throw new Error('الصفحة غير موجودة');
+  const updated = { ...page, ...patch, id, updated_at: nowIso() };
+  await putRaw('pages', updated);
+  announce('pages');
+  return updated;
 }
 
 export async function deletePage(id) {
-  unwrap(await supabase.from('pages').delete().eq('id', id));
+  await ready();
+  const db = await openDatabase();
+  const tx = db.transaction(['pages', 'blocks'], 'readwrite');
+  tx.objectStore('pages').delete(id);
+  const blocksStore = tx.objectStore('blocks');
+  const blocks = await requestResult(blocksStore.index('page_id').getAll(id));
+  blocks.forEach((block) => blocksStore.delete(block.id));
+  await transactionDone(tx);
+  announce('pages');
+  announce('blocks');
 }
 
-/* ---------------------------------------------------------------------
-   3. Ø§Ù„Ø³Ø·ÙˆØ± (blocks)
-   --------------------------------------------------------------------- */
-
-/** Ø¥Ø¶Ø§ÙØ© Ø³Ø·Ø±. fields: { page_id, kind, content, parent_id?, position } */
 export async function createBlock(fields) {
-  return unwrap(
-    await supabase.from('blocks').insert(fields).select().single()
-  );
+  await ready();
+  const stamp = nowIso();
+  const block = {
+    id: makeId(),
+    parent_id: null,
+    kind: 'text',
+    content: '',
+    is_completed: false,
+    completed_at: null,
+    position: 0,
+    due_date: null,
+    priority: 0,
+    repeat_rule: 'none',
+    reminder_at: null,
+    deleted_at: null,
+    status: 'pending',
+    created_at: stamp,
+    updated_at: stamp,
+    ...fields,
+  };
+  await putRaw('blocks', block);
+  announce('blocks');
+  return block;
 }
 
 export async function updateBlock(id, patch) {
-  return unwrap(
-    await supabase.from('blocks').update(patch).eq('id', id).select().single()
-  );
+  await ready();
+  const block = await getRaw('blocks', id);
+  if (!block) throw new Error('المهمة أو السطر غير موجود');
+  const updated = { ...block, ...patch, id, updated_at: nowIso() };
+  await putRaw('blocks', updated);
+  announce('blocks');
+  return updated;
 }
 
-/**
- * إخفاء السطر من الواجهات مع إبقائه قابلاً للاستعادة. الحذف الفعلي
- * مخصص لسلة المحذوفات فقط؛ بهذه الطريقة لا تضيع كتابة اليوم بالخطأ.
- */
 export async function trashBlock(id) {
-  return updateBlock(id, { deleted_at: new Date().toISOString() });
+  return updateBlock(id, { deleted_at: nowIso() });
 }
 
 export async function restoreBlock(id) {
@@ -143,16 +298,21 @@ export async function restoreBlock(id) {
 }
 
 export async function listTrashedBlocks() {
-  return unwrap(
-    await supabase
-      .from('blocks')
-      .select('*, pages(page_date, page_no, title)')
-      .not('deleted_at', 'is', null)
-      .order('deleted_at', { ascending: false })
-  );
+  await ready();
+  const [blocks, pages] = await Promise.all([getAllRaw('blocks'), getAllRaw('pages')]);
+  const pageMap = new Map(pages.map((page) => [page.id, page]));
+  return blocks
+    .filter((block) => block.deleted_at)
+    .sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at))
+    .map((block) => {
+      const page = pageMap.get(block.page_id);
+      return {
+        ...block,
+        pages: page ? { page_date: page.page_date, page_no: page.page_no, title: page.title } : null,
+      };
+    });
 }
 
-/** تاريخ النسخة التالية لمهمة متكررة. */
 function nextRepeatDate(dateKey, rule) {
   if (!dateKey || !rule || rule === 'none') return null;
   const date = new Date(`${dateKey}T12:00:00`);
@@ -163,8 +323,7 @@ function nextRepeatDate(dateKey, rule) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-/** حالات المهمة بترتيب الدورة — نقرة الدائرة تنتقل للحالة التالية */
-export const TASK_STATUSES = ['pending', 'in_progress', 'done', 'postponed'];
+export const TASK_STATUSES = ['pending', 'in_progress', 'done'];
 
 export const TASK_STATUS_LABELS = {
   pending: 'لم تبدأ',
@@ -174,27 +333,20 @@ export const TASK_STATUS_LABELS = {
 };
 
 export function nextTaskStatus(status) {
-  const i = TASK_STATUSES.indexOf(status || 'pending');
-  return TASK_STATUSES[(i + 1) % TASK_STATUSES.length];
+  const index = TASK_STATUSES.indexOf(status || 'pending');
+  return TASK_STATUSES[(index + 1) % TASK_STATUSES.length];
 }
 
-/**
- * ينقل مهمة لحالة جديدة. is_completed/completed_at تبقيان متزامنتين مع
- * status = 'done' حتى لا تنكسر الفلاتر القديمة التي تعتمد عليهما. وإن
- * أصبحت الحالة "مكتملة" لمهمة متكررة ينشئ النسخة التالية تلقائياً — لا
- * نعيد استخدام المهمة نفسها حتى يظل سجل الإنجاز صادقاً وقابلاً للمراجعة.
- */
 export async function setBlockStatus(block, status) {
   const done = status === 'done';
   const updated = await updateBlock(block.id, {
     status,
     is_completed: done,
-    completed_at: done ? new Date().toISOString() : null,
+    completed_at: done ? nowIso() : null,
   });
   if (!done || !block.repeat_rule || block.repeat_rule === 'none') {
     return { updated, repeated: null };
   }
-
   const dueDate = nextRepeatDate(block.due_date, block.repeat_rule);
   if (!dueDate) return { updated, repeated: null };
   const repeated = await createBlock({
@@ -210,65 +362,73 @@ export async function setBlockStatus(block, status) {
 }
 
 export async function deleteBlock(id) {
-  unwrap(await supabase.from('blocks').delete().eq('id', id));
+  await ready();
+  const blocks = await getAllRaw('blocks');
+  const ids = new Set([id]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const block of blocks) {
+      if (block.parent_id && ids.has(block.parent_id) && !ids.has(block.id)) {
+        ids.add(block.id);
+        changed = true;
+      }
+    }
+  }
+  const db = await openDatabase();
+  const tx = db.transaction('blocks', 'readwrite');
+  ids.forEach((blockId) => tx.objectStore('blocks').delete(blockId));
+  await transactionDone(tx);
+  announce('blocks');
 }
 
-/* ---------------------------------------------------------------------
-   4. Ø§Ù„Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„ØªÙ†Ø§Ø²Ù„ÙŠØ©
-   --------------------------------------------------------------------- */
-
 export async function listCountdowns() {
-  return unwrap(
-    await supabase
-      .from('countdowns')
-      .select('*')
-      .order('target_date', { ascending: true })
-  );
+  await ready();
+  return (await getAllRaw('countdowns')).sort((a, b) => a.target_date.localeCompare(b.target_date));
 }
 
 export async function createCountdown(fields) {
-  return unwrap(
-    await supabase.from('countdowns').insert(fields).select().single()
-  );
+  await ready();
+  const countdown = { id: makeId(), created_at: nowIso(), ...fields };
+  await putRaw('countdowns', countdown);
+  announce('countdowns');
+  return countdown;
+}
+
+export async function updateCountdown(id, fields) {
+  await ready();
+  const current = await getRaw('countdowns', id);
+  if (!current) throw new Error('العداد غير موجود');
+  const updated = { ...current, ...fields, id, created_at: current.created_at };
+  await putRaw('countdowns', updated);
+  announce('countdowns');
+  return updated;
 }
 
 export async function deleteCountdown(id) {
-  unwrap(await supabase.from('countdowns').delete().eq('id', id));
+  await ready();
+  await deleteRaw('countdowns', id);
+  announce('countdowns');
 }
 
-/* ---------------------------------------------------------------------
-   5. Ø§Ù„ØªØµØ¯ÙŠØ± ÙˆØ§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ (Ù†Ø³Ø®Ø© v2 â€” Ù†Ù…ÙˆØ°Ø¬ Ø§Ù„Ø¯ÙØªØ±)
-   --------------------------------------------------------------------- */
-
-/** ÙƒØ§Ù…Ù„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ù„Ø­Ø¸Ø© Ø§Ù„Ø·Ù„Ø¨ â€” Ù„Ù„Ù†Ø³Ø® Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠ ÙˆÙ„Ù„Ù…Ù„Ø®Øµ ÙˆÙ„Ù„ØªÙ‚ÙˆÙŠÙ… ÙˆÙ„Ù„Ø·Ø¨Ø§Ø¹Ø© */
 export async function exportAll() {
-  try {
-    const [pages, blocks, countdowns] = await Promise.all([
-      unwrap(await supabase.from('pages').select('*').order('page_date').order('page_no')),
-      unwrap(await supabase.from('blocks').select('*').order('position')),
-      listCountdowns(),
-    ]);
-    const backup = {
-      app: 'kitabi',
-      version: 2,
-      exported_at: new Date().toISOString(),
-      pages,
-      blocks,
-      countdowns,
-    };
-    writeOfflineSnapshot(backup);
-    return backup;
-  } catch (error) {
-    const cached = readOfflineSnapshot();
-    if (cached?.pages && cached?.blocks) return cached;
-    throw error;
-  }
+  await ready();
+  const [pages, blocks, countdowns] = await Promise.all([
+    getAllRaw('pages'),
+    getAllRaw('blocks'),
+    getAllRaw('countdowns'),
+  ]);
+  return {
+    app: 'kitabi',
+    version: 2,
+    storage: 'local-indexeddb',
+    exported_at: nowIso(),
+    pages: pages.sort((a, b) => a.page_date.localeCompare(b.page_date) || a.page_no - b.page_no),
+    blocks: blocks.sort((a, b) => Number(a.position || 0) - Number(b.position || 0)),
+    countdowns: countdowns.sort((a, b) => a.target_date.localeCompare(b.target_date)),
+  };
 }
 
-/**
- * Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ù†Ø³Ø®Ø© Ø§Ø­ØªÙŠØ§Ø·ÙŠØ© (v2): ØªÙ…Ø³Ø­ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø§Ù„ÙŠØ© ÙƒÙ„Ù‡Ø§ Ø«Ù… ØªÙØ¯Ø®Ù„
- * Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù†Ø³Ø®Ø©. Ø¹Ù…Ù„ÙŠØ© Ù…Ø¯Ù…Ù‘Ø±Ø© â€” Ø§Ù„ØªØ£ÙƒÙŠØ¯ Ù…Ø³Ø¤ÙˆÙ„ÙŠØ© ÙˆØ§Ø¬Ù‡Ø© Ø§Ù„Ø§Ø³ØªØ®Ø¯Ø§Ù….
- */
 export async function importAll(backup) {
   if (
     !backup ||
@@ -278,51 +438,29 @@ export async function importAll(backup) {
     !Array.isArray(backup.blocks) ||
     !Array.isArray(backup.countdowns)
   ) {
-    throw new Error('Ø§Ù„Ù…Ù„Ù Ù„ÙŠØ³ Ù†Ø³Ø®Ø© Ø§Ø­ØªÙŠØ§Ø·ÙŠØ© ØµØ§Ù„Ø­Ø© Ù…Ù† ÙƒØªØ§Ø¨ÙŠ (Ø§Ù„Ø¥ØµØ¯Ø§Ø± 2)');
+    throw new Error('الملف ليس نسخة احتياطية صالحة من كتابي');
   }
-
-  const wipe = (table) =>
-    supabase.from(table).delete().gte('created_at', '1970-01-01');
-  unwrap(await wipe('blocks'));
-  unwrap(await wipe('pages'));
-  unwrap(await wipe('countdowns'));
-
-  const CHUNK = 500;
-  const insertAll = async (table, rows) => {
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      unwrap(await supabase.from(table).insert(rows.slice(i, i + CHUNK)));
-    }
-  };
-
-  await insertAll('pages', backup.pages);
-  // Ø§Ù„Ø³Ø·ÙˆØ± Ø§Ù„ÙØ±Ø¹ÙŠØ© ØªØ´ÙŠØ± Ù„Ø¢Ø¨Ø§Ø¦Ù‡Ø§ (FK) â€” Ù†Ø¯Ø®Ù„ Ø§Ù„Ø¬Ø°ÙˆØ± Ø£ÙˆÙ„Ø§Ù‹ Ø«Ù… Ø§Ù„Ø£Ø¨Ù†Ø§Ø¡
-  const roots = backup.blocks.filter((b) => !b.parent_id);
-  const children = backup.blocks.filter((b) => b.parent_id);
-  await insertAll('blocks', roots);
-  await insertAll('blocks', children);
-  await insertAll('countdowns', backup.countdowns);
+  await ready();
+  const db = await openDatabase();
+  const tx = db.transaction(['pages', 'blocks', 'countdowns'], 'readwrite');
+  for (const name of ['pages', 'blocks', 'countdowns']) tx.objectStore(name).clear();
+  backup.pages.forEach((page) => {
+    const { blocks: _embeddedBlocks, ...cleanPage } = page;
+    tx.objectStore('pages').put(cleanPage);
+  });
+  backup.blocks.forEach((block) => tx.objectStore('blocks').put(block));
+  backup.countdowns.forEach((countdown) => tx.objectStore('countdowns').put(countdown));
+  await transactionDone(tx);
+  announce('pages');
+  announce('blocks');
+  announce('countdowns');
 }
 
-/* ---------------------------------------------------------------------
-   6. Ø§Ù„ØªØ²Ø§Ù…Ù† Ø§Ù„Ù„Ø­Ø¸ÙŠ (Realtime)
-   --------------------------------------------------------------------- */
-
-/**
- * Ø§Ø´ØªØ±Ø§Ùƒ Ø¨ØªØºÙŠÙŠØ±Ø§Øª Ø¬Ø¯ÙˆÙ„ Ø£Ùˆ Ø£ÙƒØ«Ø±. ÙŠØ¹ÙŠØ¯ Ø¯Ø§Ù„Ø© Ù„Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ.
- * onChange ØªÙØ³ØªØ¯Ø¹Ù‰ Ø¹Ù†Ø¯ Ø£ÙŠ Ø¥Ø¶Ø§ÙØ©/ØªØ¹Ø¯ÙŠÙ„/Ø­Ø°Ù Ù…Ù† Ø£ÙŠ Ø¬Ù‡Ø§Ø².
- */
+/** إشعار محلي للشاشات والتبويبات الأخرى في المتصفح نفسه. */
 export function onTablesChange(tables, onChange) {
-  const name = `sync-${tables.join('-')}-${Math.random().toString(36).slice(2, 8)}`;
-  const channel = supabase.channel(name);
-  for (const table of tables) {
-    channel.on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table },
-      onChange
-    );
-  }
-  channel.subscribe();
-  return () => {
-    supabase.removeChannel(channel);
+  const handler = (event) => {
+    if (tables.includes(event.detail)) onChange();
   };
+  localEvents.addEventListener('change', handler);
+  return () => localEvents.removeEventListener('change', handler);
 }

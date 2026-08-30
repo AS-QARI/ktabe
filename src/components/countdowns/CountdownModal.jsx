@@ -2,18 +2,18 @@ import { useEffect, useState } from 'react';
 import Modal from '../ui/Modal';
 
 /** نافذة إضافة عداد تنازلي: عنوان + تاريخ الهدف */
-export default function CountdownModal({ open, onClose, onSave }) {
+export default function CountdownModal({ open, onClose, onSave, onDelete, initialValue = null }) {
   const [title, setTitle] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setTitle('');
-      setTargetDate('');
+      setTitle(initialValue?.title ?? '');
+      setTargetDate(initialValue?.target_date ?? '');
       setBusy(false);
     }
-  }, [open]);
+  }, [open, initialValue]);
 
   const canSave = title.trim().length > 0 && targetDate && !busy;
 
@@ -56,8 +56,13 @@ export default function CountdownModal({ open, onClose, onSave }) {
         </div>
 
         <button type="submit" className="btn-primary" disabled={!canSave}>
-          إضافة العداد
+          {initialValue ? 'حفظ التعديل' : 'إضافة العداد'}
         </button>
+        {initialValue && onDelete && (
+          <button type="button" className="countdown-delete-btn" onClick={onDelete} disabled={busy}>
+            حذف العدّاد
+          </button>
+        )}
       </form>
     </Modal>
   );

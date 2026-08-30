@@ -6,9 +6,9 @@ import {
   TASK_STATUS_LABELS,
   createCountdown,
   deleteCountdown,
+  updateCountdown,
   createPage,
   createBlock,
-  updateBlock,
 } from '../data/storage';
 import { useLiveData } from '../hooks/useLiveData';
 import {
@@ -86,13 +86,6 @@ function plainContent(content) {
   return text;
 }
 
-/** "أمس" / "قبل يومين" / "قبل 5 أيام" — عمر المهمة المتأخرة */
-function overdueAgeLabel(dateKey, today) {
-  const n = diffDaysBetweenKeys(dateKey, today);
-  if (n === 1) return 'أمس';
-  return `قبل ${daysAr(n)}`;
-}
-
 /** عنوان مجموعة يوم قادم: "غداً" أو "الأحد، 12 يوليو" */
 function upcomingGroupLabel(dateKey, today) {
   const diff = diffDaysBetweenKeys(today, dateKey);
@@ -154,6 +147,8 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
 
   const [monthOpen, setMonthOpen] = useState(false);
   const [countdownModalOpen, setCountdownModalOpen] = useState(false);
+  const [editingCountdown, setEditingCountdown] = useState(null);
+  const [tasksOpen, setTasksOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [taskSheet, setTaskSheet] = useState(null);
   const [completedOpen, setCompletedOpen] = useState(false);
@@ -303,6 +298,20 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
       });
   }, [data?.countdowns, today]);
 
+  const saveCountdownEdit = async (fields) => {
+    if (!editingCountdown) return;
+    await updateCountdown(editingCountdown.id, fields);
+    setEditingCountdown(null);
+  };
+
+  const removeEditingCountdown = async () => {
+    if (!editingCountdown) return;
+    if (!window.confirm(`حذف عداد «${editingCountdown.title}»؟`)) return;
+    await deleteCountdown(editingCountdown.id);
+    setEditingCountdown(null);
+    await live.reload();
+  };
+
   const countdownsByDay = useMemo(() => {
     const byDay = new Map();
     for (const c of countdowns) {
@@ -351,27 +360,6 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
   const nextRootPosition = (pageId, blocks) => {
     const roots = blocks.filter((b) => b.page_id === pageId && !b.parent_id);
     return roots.length ? Math.max(...roots.map((b) => b.position || 0)) + 1 : 1;
-  };
-
-  /**
-   * نقل مهمة متأخرة إلى صفحة اليوم (سلوك «أعد جدولتها لليوم»
-   * في Todoist وAny.do): يتغير الموعد فقط، وتبقى المهمة في ملاحظتها
-   * الأصلية كي لا تفقد سياقها.
-   */
-  const moveTaskToToday = async (task) => {
-    navigator.vibrate?.(12);
-    try {
-      live.setData((d) => ({
-        ...d,
-        blocks: d.blocks.map((b) => {
-          if (b.id === task.id) return { ...b, due_date: today };
-          return b;
-        }),
-      }));
-      await updateBlock(task.id, { due_date: today });
-    } catch {
-      live.reload();
-    }
   };
 
   /** إضافة مهمة جديدة على يوم محدد (اليوم/غداً/أي تاريخ) */
@@ -482,7 +470,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
           <>
             <div className="countdown-strip" aria-label="العدادات التنازلية">
               {countdowns.map((c) => (
-                <CountdownChip key={c.id} countdown={c} onDelete={removeCountdown} />
+                <CountdownChip key={c.id} countdown={c} onDelete={removeCountdown} onEdit={setEditingCountdown} />
               ))}
               <button
                 type="button"
@@ -495,7 +483,17 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
               </button>
             </div>
 
-            <div
+            <button
+              type="button"
+              className={`calendar-tasks-toggle${tasksOpen ? ' active' : ''}`}
+              onClick={() => setTasksOpen((open) => !open)}
+              aria-expanded={tasksOpen}
+            >
+              <span>{tasksOpen ? 'إخفاء المهام' : 'إظهار المهام المتأخرة والحالية'}</span>
+              <ChevronRightIcon size={17} />
+            </button>
+
+            {tasksOpen && <div
               className="task-snapshot"
               aria-label="ملخص المهام"
               style={{ gridTemplateRows: snapshotRows }}
@@ -523,19 +521,11 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                   <TaskPreviewRow
                     key={task.id}
                     task={task}
-                    meta={overdueAgeLabel(task.date, today)}
+                    meta={`الموعد: ${formatFullDate(parseDateKey(task.date))} · مضى ${daysAr(diffDaysBetweenKeys(task.date, today))}`}
                     subCount={openSubCount.get(task.id) ?? 0}
                     onToggle={() => cycleBlockStatus(task)}
                     onOpen={() => openDayAt(task.date)}
-                    action={
-                      <button
-                        type="button"
-                        className="task-row-action"
-                        onClick={() => moveTaskToToday(task)}
-                      >
-                        اليوم
-                      </button>
-                    }
+                    action={<span className="task-overdue-countdown"><strong>{diffDaysBetweenKeys(task.date, today)}</strong><small>مضى</small></span>}
                   />
                 )}
               </TaskPreviewSection>
@@ -585,7 +575,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
               </TaskPreviewSection>
                 </>
               )}
-            </div>
+            </div>}
           </>
         )}
       </div>
@@ -609,7 +599,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                 task={task}
                 meta={
                   taskSheet?.type === 'overdue'
-                    ? overdueAgeLabel(task.date, today)
+                    ? `الموعد: ${formatFullDate(parseDateKey(task.date))} · مضى ${daysAr(diffDaysBetweenKeys(task.date, today))}`
                     : taskSheet?.type === 'upcoming'
                       ? upcomingGroupLabel(task.date, today)
                       : undefined
@@ -617,17 +607,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                 subCount={openSubCount.get(task.id) ?? 0}
                 onToggle={() => cycleBlockStatus(task)}
                 onOpen={() => openDayAt(task.date)}
-                action={
-                  taskSheet?.type === 'overdue' ? (
-                    <button
-                      type="button"
-                      className="task-row-action"
-                      onClick={() => moveTaskToToday(task)}
-                    >
-                      اليوم
-                    </button>
-                  ) : null
-                }
+                action={taskSheet?.type === 'overdue' ? <span className="task-overdue-countdown"><strong>{diffDaysBetweenKeys(task.date, today)}</strong><small>مضى</small></span> : null}
               />
             ))}
           </div>
@@ -752,6 +732,14 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
         open={countdownModalOpen}
         onClose={() => setCountdownModalOpen(false)}
         onSave={saveCountdown}
+      />
+
+      <CountdownModal
+        open={Boolean(editingCountdown)}
+        onClose={() => setEditingCountdown(null)}
+        onSave={saveCountdownEdit}
+        onDelete={removeEditingCountdown}
+        initialValue={editingCountdown}
       />
 
       <TaskComposer
@@ -1001,7 +989,7 @@ function TaskComposer({ open, today, onClose, onAdd }) {
  * بطاقة عداد مضغوطة داخل الصف الأفقي — الرقم الكبير هو البطل.
  * كل العدّادات ظاهرة دفعةً واحدة بلا فتح ورقة. اضغط مطولاً للحذف.
  */
-function CountdownChip({ countdown, onDelete }) {
+function CountdownChip({ countdown, onDelete, onEdit }) {
   const timer = useRef(null);
   const { diff, state } = countdown.meta ?? countdownMeta(countdown, todayKey());
   const dateLabel = new Intl.DateTimeFormat('ar-u-ca-gregory-nu-latn', {
@@ -1031,6 +1019,7 @@ function CountdownChip({ countdown, onDelete }) {
       onPointerLeave={cancel}
       onPointerCancel={cancel}
       onContextMenu={(e) => e.preventDefault()}
+      onClick={() => onEdit?.(countdown)}
       title="اضغط مطولاً للحذف"
     >
       <span className="countdown-chip-main">

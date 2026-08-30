@@ -41,7 +41,10 @@ import {
   CopyIcon,
   XIcon,
   PinIcon,
+  ChecklistIcon,
+  NoteIcon,
 } from '../components/ui/Icons';
+import DayTasks from '../components/tasks/DayTasks';
 import './screens.css';
 import './DayScreen.css';
 
@@ -339,6 +342,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [activePageId, setActivePageId] = useState(null);
   const [pendingOpenPageId, setPendingOpenPageId] = useState(null);
   const [notesScope, setNotesScope] = useState('day');
+  const [dayView, setDayView] = useState(() =>
+    localStorage.getItem('kitabi-day-view') === 'notes' ? 'notes' : 'tasks'
+  );
   const [pinnedIds, setPinnedIds] = useState(() => readPinnedIds());
   const [draggingId, setDraggingId] = useState(null);
   const [dragGhost, setDragGhost] = useState(null); // بطاقة الشبح التي تتبع الإصبع
@@ -484,15 +490,36 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   }, [blocks]);
 
   const focusedRow = rows.find((r) => r.block.id === focusedId) ?? null;
-  const dayBlocks = useMemo(
-    () => sortedPages.flatMap((p) => (p.blocks ?? []).filter((block) => !block.deleted_at)),
-    [sortedPages]
+  const scheduledTasks = useMemo(
+    () => allPages.flatMap((taskPage) =>
+      (taskPage.blocks ?? [])
+        .filter((block) => block.kind === 'task' && !block.deleted_at)
+        .map((block) => ({
+          ...block,
+          schedule_date: block.due_date || taskPage.page_date,
+        }))
+    ),
+    [allPages]
   );
-  const dayTasks = dayBlocks.filter((b) => b.kind === 'task');
-  const dayDoneTasks = dayTasks.filter((b) => b.is_completed);
+  const dayTasks = scheduledTasks.filter((task) => task.schedule_date === dateKey);
+  const overdueTasks = scheduledTasks.filter((task) =>
+    task.schedule_date < dateKey && task.status !== 'done' && !task.is_completed
+  );
+  const dayDoneTasks = dayTasks.filter((task) => task.status === 'done' || task.is_completed);
   const dayProgress =
     dayTasks.length === 0 ? 0 : Math.round((dayDoneTasks.length / dayTasks.length) * 100);
   const isPagePinned = (p) => Boolean(p.is_pinned || pinnedIds.has(p.id));
+
+  const switchDayView = (view) => {
+    navigator.vibrate?.(5);
+    setDayView(view);
+    localStorage.setItem('kitabi-day-view', view);
+    if (view === 'tasks') {
+      setActivePageId(null);
+      setFocusedId(null);
+      setFormatMenuOpen(false);
+    }
+  };
   // المثبّتة أولاً، والأحدث تثبيتاً أولاً داخلها، ثم بقية الترتيب.
   const pinnedFirst = (a, b) => {
     const pinGroup = Number(b.pinned) - Number(a.pinned);
@@ -634,6 +661,115 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     setAllPages((ps) => [nextPage, ...ps]);
     setActivePageId(nextPage.id);
     return nextPage;
+  };
+
+  /** إنشاء مهمة من قائمة اليوم مباشرةً دون فتح محرر الملاحظة. */
+  const addDayTask = async (content) => {
+    markEdit();
+    try {
+      let targetPage = sortedPages[0];
+      if (!targetPage) {
+        const created = await createPage(dateKey, 1);
+        targetPage = { ...created, blocks: [] };
+        setPages([targetPage]);
+        setAllPages((ps) => [targetPage, ...ps]);
+      }
+      const livePage = (pages ?? []).find((p) => p.id === targetPage.id) ?? targetPage;
+      const position = Math.max(0, ...(livePage.blocks ?? []).map((b) => Number(b.position || 0))) + 1;
+      const block = await createBlock({
+        page_id: targetPage.id,
+        kind: 'task',
+        content,
+        position,
+        status: 'pending',
+        due_date: dateKey,
+        task_order: Math.max(0, ...dayTasks.map((task) => Number(task.task_order ?? task.position ?? 0))) + 1,
+      });
+      setPages((ps) => ps.map((p) => p.id === targetPage.id
+        ? { ...p, blocks: [...(p.blocks ?? []), block] }
+        : p));
+      touchPageInAllPages(targetPage.id, (p) => ({ ...p, blocks: [...(p.blocks ?? []), block] }));
+      setSaveState('saved');
+      navigator.vibrate?.(8);
+      return true;
+    } catch {
+      setSaveState('error');
+      return false;
+    }
+  };
+
+  const updateDayTaskEverywhere = (blockId, updater) => {
+    setPages((ps) => ps?.map((p) => ({
+      ...p,
+      blocks: (p.blocks ?? []).map((b) => b.id === blockId ? updater(b) : b),
+    })) ?? ps);
+    setAllPages((ps) => ps.map((p) => ({
+      ...p,
+      blocks: (p.blocks ?? []).map((b) => b.id === blockId ? updater(b) : b),
+    })));
+  };
+
+  const toggleDayTask = (block) => {
+    markEdit();
+    const currentStatus = block.status === 'postponed' ? 'pending' : (block.status || 'pending');
+    const status = currentStatus === 'pending'
+      ? 'in_progress'
+      : currentStatus === 'in_progress'
+        ? 'done'
+        : 'pending';
+    const completedAt = status === 'done' ? new Date().toISOString() : null;
+    updateDayTaskEverywhere(block.id, (item) => ({
+      ...item,
+      status,
+      is_completed: status === 'done',
+      completed_at: completedAt,
+    }));
+    navigator.vibrate?.(10);
+    setBlockStatus(block, status)
+      .then(({ repeated }) => {
+        if (repeated) {
+          setPages((ps) => ps.map((p) => p.id === repeated.page_id
+            ? { ...p, blocks: [...(p.blocks ?? []), repeated] }
+            : p));
+          touchPageInAllPages(repeated.page_id, (p) => ({ ...p, blocks: [...(p.blocks ?? []), repeated] }));
+        }
+        setSaveState('saved');
+      })
+      .catch(() => { setSaveState('error'); load(); });
+  };
+
+  const renameDayTask = (block, content) => {
+    markEdit();
+    updateDayTaskEverywhere(block.id, (item) => ({ ...item, content }));
+    updateBlock(block.id, { content })
+      .then(() => setSaveState('saved'))
+      .catch(() => { setSaveState('error'); load(); });
+  };
+
+  const reorderDayTasks = (orderedIds) => {
+    if (!orderedIds?.length) return;
+    markEdit();
+    const orderById = new Map(orderedIds.map((id, index) => [id, index + 1]));
+    setPages((ps) => ps?.map((taskPage) => ({
+      ...taskPage,
+      blocks: (taskPage.blocks ?? []).map((block) =>
+        orderById.has(block.id) ? { ...block, task_order: orderById.get(block.id) } : block
+      ),
+    })) ?? ps);
+    setAllPages((ps) => ps.map((taskPage) => ({
+      ...taskPage,
+      blocks: (taskPage.blocks ?? []).map((block) =>
+        orderById.has(block.id) ? { ...block, task_order: orderById.get(block.id) } : block
+      ),
+    })));
+    Promise.all(orderedIds.map((id, index) => updateBlock(id, { task_order: index + 1 })))
+      .then(() => setSaveState('saved'))
+      .catch(() => { setSaveState('error'); load(); });
+  };
+
+  const deleteDayTask = (id) => {
+    if (!id) return;
+    trashBlock(id).then(() => load()).catch(() => load());
   };
 
   const addNotePage = async () => {
@@ -1510,11 +1646,11 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
       <div className="book">
         <div
-          key={`${dateKey}-${page?.id ?? 'notes'}`}
+          key={`${dateKey}-${dayView}-${page?.id ?? 'overview'}`}
           className={`paper flip-${flip}`}
         >
-          <header className={`paper-head${page ? ' note-open' : ''}`}>
-            {page && (
+          <header className={`paper-head${page && dayView === 'notes' ? ' note-open' : ''}${dayView === 'tasks' ? ' tasks-head' : ''}`}>
+            {page && dayView === 'notes' && (
               <button
                 type="button"
                 className="note-back"
@@ -1528,29 +1664,67 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
                 ملاحظاتي
               </button>
             )}
-            <div className="paper-date">
-              <span className="paper-weekday">{relativeDayLabel(dateKey)} · {formatWeekday(d)}</span>
-              <span className="paper-daynum">{formatDateWithYear(d)}</span>
-              {page ? (
-                <input
-                  className="day-title-input"
-                  value={pageMeta.title ?? ''}
-                  placeholder="عنوان الملاحظة"
-                  onChange={(e) => savePagePatch({ title: e.target.value })}
-                />
-              ) : (
-                <h1 className="notes-title">ملاحظات اليوم</h1>
-              )}
-            </div>
-            <button
-              type="button"
-              className="note-add-head"
-              aria-label="ملاحظة جديدة"
-              onClick={addNotePage}
-            >
-              +
-            </button>
+            {dayView === 'notes' && (
+              <div className="paper-date">
+                <span className="paper-weekday">{relativeDayLabel(dateKey)} · {formatWeekday(d)}</span>
+                <span className="paper-daynum">{formatDateWithYear(d)}</span>
+                {page ? (
+                  <input
+                    className="day-title-input"
+                    value={pageMeta.title ?? ''}
+                    placeholder="عنوان الملاحظة"
+                    onChange={(e) => savePagePatch({ title: e.target.value })}
+                  />
+                ) : (
+                  <h1 className="notes-title">ملاحظات اليوم</h1>
+                )}
+              </div>
+            )}
+            {dayView === 'notes' ? (
+              <button
+                type="button"
+                className="note-add-head"
+                aria-label="ملاحظة جديدة"
+                onClick={addNotePage}
+              >
+                +
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="note-add-head"
+                aria-label="إضافة مهمة"
+                onClick={() => document.getElementById('day-task-add')?.focus()}
+              >
+                +
+              </button>
+            )}
           </header>
+
+          {(!page || dayView === 'tasks') && (
+            <div className="day-view-switch" aria-label="محتوى يومي">
+              <button
+                type="button"
+                className={dayView === 'tasks' ? 'active' : ''}
+                aria-pressed={dayView === 'tasks'}
+                onClick={() => switchDayView('tasks')}
+              >
+                <ChecklistIcon size={17} />
+                مهمات
+                {dayTasks.length > 0 && <span>{dayDoneTasks.length}/{dayTasks.length}</span>}
+              </button>
+              <button
+                type="button"
+                className={dayView === 'notes' ? 'active' : ''}
+                aria-pressed={dayView === 'notes'}
+                onClick={() => switchDayView('notes')}
+              >
+                <NoteIcon size={17} />
+                ملاحظات
+                {noteCards.length > 0 && <span>{noteCards.length}</span>}
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="error-banner">
@@ -1563,7 +1737,20 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             <div className="inline-loading"><div className="spinner" /></div>
           )}
 
-          {pages !== null && !error && !page && (
+          {pages !== null && !error && dayView === 'tasks' && (
+            <DayTasks
+              tasks={dayTasks.map((task) => ({ ...task, text: contentText(task.content) || 'مهمة بلا عنوان' }))}
+              overdueTasks={overdueTasks.map((task) => ({ ...task, text: contentText(task.content) || 'مهمة بلا عنوان' }))}
+              progress={dayProgress}
+              onAdd={addDayTask}
+              onToggle={toggleDayTask}
+              onRename={renameDayTask}
+              onReorder={reorderDayTasks}
+              onDelete={deleteDayTask}
+            />
+          )}
+
+          {pages !== null && !error && dayView === 'notes' && !page && (
             <section className="notes-list" aria-label="ملاحظات اليوم">
               <div className="notes-scope-switch" aria-label="نطاق الملاحظات">
                 <button
@@ -1635,7 +1822,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             </section>
           )}
 
-          {pages !== null && !error && page && (
+          {pages !== null && !error && dayView === 'notes' && page && (
             <div
               className={`paper-lines${selectMode ? ' select-mode' : ''}${draggingId ? ' is-dragging' : ''}`}
               ref={paperLinesRef}
