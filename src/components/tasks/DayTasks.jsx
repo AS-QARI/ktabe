@@ -54,6 +54,10 @@ function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDragSt
           value={draft}
           aria-label="اسم المهمة"
           onChange={(event) => setDraft(event.target.value)}
+          onFocus={(event) => {
+            const input = event.currentTarget;
+            requestAnimationFrame(() => input.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+          }}
           onBlur={commit}
           onKeyDown={(event) => {
             if (event.key === 'Enter') event.currentTarget.blur();
@@ -295,6 +299,10 @@ export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggl
           enterKeyHint="done"
           autoComplete="off"
           aria-label="مهمة جديدة"
+          onFocus={(event) => {
+            const input = event.currentTarget;
+            requestAnimationFrame(() => input.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+          }}
         />
         <button type="submit" disabled={!draft.trim() || adding}>{adding ? '…' : 'إضافة'}</button>
       </form>
