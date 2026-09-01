@@ -98,17 +98,6 @@
 }
 
 .remaining-filter { margin: 4px 0 6px auto; display: block; }
-.day-task-today-drop {
-  min-height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 4px;
-  border: 1px dashed rgba(255,159,10,.28);
-  border-radius: 9px;
-  color: var(--label-tertiary);
-  font-size: 10px;
-}
 
 .overdue-group .day-task-group-head { color: #ff7b72; }
 .overdue-group .day-task-group-head span { background: rgba(255,84,84,.13); }

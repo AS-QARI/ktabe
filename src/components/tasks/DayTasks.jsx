@@ -154,7 +154,7 @@ function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReo
     event.preventDefault();
     const hit = document.elementFromPoint(event.clientX, event.clientY);
     const overTrash = Boolean(hit?.closest?.('.day-task-trash'));
-    const overToday = Boolean(hit?.closest?.('.day-task-today-drop'));
+    const overToday = Boolean(overdue && hit?.closest?.('.today-group'));
     setTrashActive(overTrash);
     moveToTodayRef.current = overToday;
     if (overTrash || overToday) return;
@@ -275,13 +275,6 @@ export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggl
         )}
 
         <section className="day-task-group today-group" aria-label="مهمات هذا اليوم">
-          {overdueTasks.length > 0 && (
-            <header className="day-task-group-head">
-              <strong>اليوم</strong>
-              <span>{tasks.length}</span>
-            </header>
-          )}
-
           {tasks.length === 0 ? (
             <div className={`day-tasks-empty${overdueTasks.length ? ' compact' : ''}`}>
               <span className="day-tasks-empty-check"><CheckIcon size={22} /></span>
@@ -291,7 +284,6 @@ export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggl
           ) : (
             <>
             <button type="button" className="day-task-filter-btn remaining-filter" onClick={() => setRemainingOnly((only) => !only)}>{remainingOnly ? 'عرض الكل' : 'المتبقية فقط'}</button>
-            <div className="day-task-today-drop">اسحب المهمة المتأخرة هنا لنقلها لليوم</div>
             <ReorderableTaskList
               tasks={visibleTasks}
               onToggle={onToggle}
