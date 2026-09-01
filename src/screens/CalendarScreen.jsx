@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import {
-  exportAll,
+  getProductivityData,
   setBlockStatus,
   nextTaskStatus,
   TASK_STATUS_LABELS,
@@ -141,7 +141,7 @@ function allocatePreviews(counts) {
  * والعدادات التنازلية خلف ضغطة في أوراق منزلقة.
  */
 export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
-  const live = useLiveData(exportAll, ALL_TABLES);
+  const live = useLiveData(getProductivityData, ALL_TABLES);
   const data = live.data;
   const today = todayKey();
 
@@ -265,11 +265,11 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
     [overdue.length, todayTasks.length, upcomingCount]
   );
   const allTasksEmpty =
-    overdue.length === 0 && todayTasks.length === 0 && upcomingCount === 0;
+    overdue.length === 0 && todayTasks.length === 0;
   // القسم الفارغ صف مضغوط (auto)، والنشط يأخذ حصة تتناسب مع صفوفه
   const snapshotRows = allTasksEmpty
     ? '1fr'
-    : [overdue.length, todayTasks.length, upcomingCount]
+    : [overdue.length, todayTasks.length]
         .map((count, i) => {
           if (count === 0) return 'auto';
           const shown = [previewAlloc.late, previewAlloc.today, previewAlloc.next][i];
@@ -554,25 +554,6 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
                 )}
               </TaskPreviewSection>
 
-              <TaskPreviewSection
-                tone="next"
-                title="قادمة"
-                count={upcomingCount}
-                tasks={upcomingTasks.slice(0, previewAlloc.next)}
-                empty="لا مهام قادمة"
-                onMore={() => setTaskSheet({ type: 'upcoming', title: 'المهام القادمة' })}
-              >
-                {(task) => (
-                  <TaskPreviewRow
-                    key={task.id}
-                    task={task}
-                    meta={upcomingGroupLabel(task.date, today)}
-                    subCount={openSubCount.get(task.id) ?? 0}
-                    onToggle={() => cycleBlockStatus(task)}
-                    onOpen={() => openDayAt(task.date)}
-                  />
-                )}
-              </TaskPreviewSection>
                 </>
               )}
             </div>}

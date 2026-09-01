@@ -369,20 +369,20 @@
 /* ---------- لقطة المهام ---------- */
 
 .task-snapshot {
-  flex: 1 1 0;
+  flex: 0 0 auto;
   min-height: 0;
   display: grid;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto auto;
   gap: var(--space-2);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .task-preview {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 6px;
   padding: 10px 12px;
   border-radius: 18px;

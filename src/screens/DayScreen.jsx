@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getDayPages,
+  getAgendaTasks,
+  getWrittenDayKeys,
   listAllPages,
   createPage,
   updatePage,
@@ -333,6 +335,9 @@ function noteCardMeta(p, localTitle = '') {
 export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [pages, setPages] = useState(null); // null = يحمّل
   const [allPages, setAllPages] = useState([]);
+  const [allPagesLoaded, setAllPagesLoaded] = useState(false);
+  const [agendaTasks, setAgendaTasks] = useState([]);
+  const [writtenDayKeys, setWrittenDayKeys] = useState(() => new Set());
   const [error, setError] = useState(null);
   const [focusedId, setFocusedId] = useState(null);
   const [pendingFocus, setPendingFocus] = useState(null);
@@ -356,6 +361,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   const [saveState, setSaveState] = useState('saved'); // saved | saving | error
 
   const lastEditRef = useRef(0);
+  const allPagesLoadedRef = useRef(false);
   const saveTimers = useRef(new Map());
   const inputRefs = useRef(new Map());
   const dateInputRef = useRef(null);
@@ -371,12 +377,14 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
   const load = useCallback(async () => {
     try {
-      const [dayPages, everyPage] = await Promise.all([
+      const [dayPages, agenda, writtenDates] = await Promise.all([
         getDayPages(dateKey),
-        listAllPages(),
+        getAgendaTasks(dateKey),
+        getWrittenDayKeys(shiftDateKey(dateKey, -3), shiftDateKey(dateKey, 3)),
       ]);
       setPages(dayPages);
-      setAllPages(everyPage);
+      setAgendaTasks(agenda);
+      setWrittenDayKeys(new Set(writtenDates));
       setError(null);
       setSaveState('saved');
     } catch (e) {
@@ -392,6 +400,23 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     setFormatMenuOpen(false);
     load();
   }, [load]);
+
+  const loadAllPages = useCallback(async () => {
+    try {
+      const everyPage = await listAllPages();
+      allPagesLoadedRef.current = true;
+      setAllPagesLoaded(true);
+      setAllPages(everyPage);
+    } catch (e) {
+      setError(e.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (dayView === 'notes' && notesScope === 'all' && !allPagesLoaded) {
+      loadAllPages();
+    }
+  }, [allPagesLoaded, dayView, loadAllPages, notesScope]);
 
   useEffect(() => {
     const updateMobileChrome = () => {
@@ -423,13 +448,16 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     const off = onTablesChange(SYNC_TABLES, () => {
       if (Date.now() - lastEditRef.current < 4000) return;
       clearTimeout(t);
-      t = setTimeout(load, 300);
+      t = setTimeout(() => {
+        load();
+        if (allPagesLoadedRef.current) loadAllPages();
+      }, 300);
     });
     return () => {
       off();
       clearTimeout(t);
     };
-  }, [load]);
+  }, [load, loadAllPages]);
 
   const sortedPages = useMemo(
     () => [...(pages ?? [])].sort((a, b) => a.page_no - b.page_no),
@@ -439,17 +467,6 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     () => [...allPages].sort((a, b) => noteUpdatedAt(b) - noteUpdatedAt(a)),
     [allPages]
   );
-  // أيام تحمل كتابة فعلية: عنوان أو سطر واحد على الأقل غير فارغ
-  const writtenDayKeys = useMemo(() => {
-    const keys = new Set();
-    for (const p of allPages) {
-      const written =
-        Boolean(p.title?.trim()) ||
-        (p.blocks ?? []).some((b) => !isEmptyContent(b.content));
-      if (written) keys.add(p.page_date);
-    }
-    return keys;
-  }, [allPages]);
   const page = sortedPages.find((p) => p.id === activePageId) ?? null;
   const blocks = useMemo(
     () => (page?.blocks ?? []).filter((block) => !block.deleted_at),
@@ -490,20 +507,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   }, [blocks]);
 
   const focusedRow = rows.find((r) => r.block.id === focusedId) ?? null;
-  const scheduledTasks = useMemo(
-    () => allPages.flatMap((taskPage) =>
-      (taskPage.blocks ?? [])
-        .filter((block) => block.kind === 'task' && !block.deleted_at)
-        .map((block) => ({
-          ...block,
-          schedule_date: block.due_date || taskPage.page_date,
-        }))
-    ),
-    [allPages]
-  );
-  const dayTasks = scheduledTasks.filter((task) => task.schedule_date === dateKey);
-  const overdueTasks = scheduledTasks.filter((task) =>
-    task.schedule_date < dateKey && task.status !== 'done' && !task.is_completed
+  const dayTasks = agendaTasks.filter((task) => task.due_date === dateKey);
+  const overdueTasks = agendaTasks.filter((task) =>
+    task.due_date < dateKey && task.status !== 'done' && !task.is_completed
   );
   const dayDoneTasks = dayTasks.filter((task) => task.status === 'done' || task.is_completed);
   const dayProgress =
@@ -564,7 +570,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         .sort(pinnedFirst),
     [sortedAllPages, pinnedIds]
   );
-  const visibleNoteCards = notesScope === 'all' ? allNoteCards : noteCards;
+  const visibleNoteCards = notesScope === 'all' ? (allPagesLoaded ? allNoteCards : []) : noteCards;
 
   useEffect(() => {
     if (!pendingOpenPageId || pages === null) return;
@@ -607,9 +613,14 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       ps.map((p) => (p.id === page.id ? { ...p, blocks: fn(p.blocks) } : p))
     );
 
+  // قائمة «كل الملاحظات» اختيارية؛ لا نحمّلها ولا نحدّثها قبل أن يفتحها المستخدم.
+  const updateAllPages = (updater) => {
+    if (allPagesLoadedRef.current) setAllPages(updater);
+  };
+
   const touchPageInAllPages = (pageId, updater) => {
     const updatedAt = new Date().toISOString();
-    setAllPages((ps) =>
+    updateAllPages((ps) =>
       ps.map((p) =>
         p.id === pageId ? { ...updater(p), updated_at: updatedAt } : p
       )
@@ -658,7 +669,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     const created = await createPage(dateKey, 1);
     const nextPage = { ...created, blocks: [] };
     setPages([nextPage]);
-    setAllPages((ps) => [nextPage, ...ps]);
+    updateAllPages((ps) => [nextPage, ...ps]);
     setActivePageId(nextPage.id);
     return nextPage;
   };
@@ -672,7 +683,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         const created = await createPage(dateKey, 1);
         targetPage = { ...created, blocks: [] };
         setPages([targetPage]);
-        setAllPages((ps) => [targetPage, ...ps]);
+        updateAllPages((ps) => [targetPage, ...ps]);
       }
       const livePage = (pages ?? []).find((p) => p.id === targetPage.id) ?? targetPage;
       const position = Math.max(0, ...(livePage.blocks ?? []).map((b) => Number(b.position || 0))) + 1;
@@ -689,6 +700,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         ? { ...p, blocks: [...(p.blocks ?? []), block] }
         : p));
       touchPageInAllPages(targetPage.id, (p) => ({ ...p, blocks: [...(p.blocks ?? []), block] }));
+      setAgendaTasks((tasks) => [...tasks, block]);
       setSaveState('saved');
       navigator.vibrate?.(8);
       return true;
@@ -703,10 +715,11 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       ...p,
       blocks: (p.blocks ?? []).map((b) => b.id === blockId ? updater(b) : b),
     })) ?? ps);
-    setAllPages((ps) => ps.map((p) => ({
+    updateAllPages((ps) => ps.map((p) => ({
       ...p,
       blocks: (p.blocks ?? []).map((b) => b.id === blockId ? updater(b) : b),
     })));
+    setAgendaTasks((tasks) => tasks.map((task) => task.id === blockId ? updater(task) : task));
   };
 
   const toggleDayTask = (block) => {
@@ -732,6 +745,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
             ? { ...p, blocks: [...(p.blocks ?? []), repeated] }
             : p));
           touchPageInAllPages(repeated.page_id, (p) => ({ ...p, blocks: [...(p.blocks ?? []), repeated] }));
+          if (repeated.due_date <= dateKey) setAgendaTasks((tasks) => [...tasks, repeated]);
         }
         setSaveState('saved');
       })
@@ -756,12 +770,15 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         orderById.has(block.id) ? { ...block, task_order: orderById.get(block.id) } : block
       ),
     })) ?? ps);
-    setAllPages((ps) => ps.map((taskPage) => ({
+    updateAllPages((ps) => ps.map((taskPage) => ({
       ...taskPage,
       blocks: (taskPage.blocks ?? []).map((block) =>
         orderById.has(block.id) ? { ...block, task_order: orderById.get(block.id) } : block
       ),
     })));
+    setAgendaTasks((tasks) => tasks.map((task) =>
+      orderById.has(task.id) ? { ...task, task_order: orderById.get(task.id) } : task
+    ));
     Promise.all(orderedIds.map((id, index) => updateBlock(id, { task_order: index + 1 })))
       .then(() => setSaveState('saved'))
       .catch(() => { setSaveState('error'); load(); });
@@ -769,7 +786,15 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
   const deleteDayTask = (id) => {
     if (!id) return;
-    trashBlock(id).then(() => load()).catch(() => load());
+    setAgendaTasks((tasks) => tasks.filter((task) => task.id !== id));
+    trashBlock(id).catch(() => load());
+  };
+
+  const moveOverdueToToday = (id) => {
+    const task = agendaTasks.find((item) => item.id === id);
+    if (!task) return;
+    updateDayTaskEverywhere(id, (item) => ({ ...item, due_date: dateKey, calendar_only: false }));
+    updateBlock(id, { due_date: dateKey, calendar_only: false }).catch(() => load());
   };
 
   const addNotePage = async () => {
@@ -780,7 +805,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       const created = await createPage(dateKey, nextNo);
       const nextPage = { ...created, blocks: [] };
       setPages((ps) => [...(ps ?? []), nextPage].sort((a, b) => a.page_no - b.page_no));
-      setAllPages((ps) => [nextPage, ...ps]);
+      updateAllPages((ps) => [nextPage, ...ps]);
       setActivePageId(nextPage.id);
       setFocusedId(null);
       setCaretIntent('end');
@@ -813,7 +838,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     };
 
     setPages((ps) => ps?.map((p) => (p.id === pageId ? { ...p, ...patch } : p)) ?? ps);
-    setAllPages((ps) => ps.map((p) => (p.id === pageId ? { ...p, ...patch } : p)));
+    updateAllPages((ps) => ps.map((p) => (p.id === pageId ? { ...p, ...patch } : p)));
     setPinnedIds((prev) => {
       const next = new Set(prev);
       if (isPinned) next.delete(pageId);
@@ -900,9 +925,11 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         kind: block.kind,
         content: carry,
         position,
+        due_date: block.kind === 'task' ? block.due_date : null,
       });
       mutate((bs) => [...bs, b]);
       touchPageInAllPages(page.id, (p) => ({ ...p, blocks: [...(p.blocks ?? []), b] }));
+      if (b.kind === 'task' && b.due_date <= dateKey) setAgendaTasks((tasks) => [...tasks, b]);
       setCaretIntent('start');
       setPendingFocus(b.id);
     } catch {
@@ -931,11 +958,14 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
           kind: block.kind,
           content: htmls[i],
           position: block.position + step * (i + 1),
+          due_date: block.kind === 'task' ? block.due_date : null,
         });
         created.push(b);
       }
       mutate((bs) => [...bs, ...created]);
       touchPageInAllPages(page.id, (p) => ({ ...p, blocks: [...(p.blocks ?? []), ...created] }));
+      const dueTasks = created.filter((block) => block.kind === 'task' && block.due_date <= dateKey);
+      if (dueTasks.length) setAgendaTasks((tasks) => [...tasks, ...dueTasks]);
       setCaretIntent('end');
       setPendingFocus(created.at(-1).id);
     } catch {
@@ -1010,11 +1040,15 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         b.id === block.id ? { ...b, status, is_completed: done, completed_at: completedAt } : b
       ),
     }));
+    setAgendaTasks((tasks) => tasks.map((task) =>
+      task.id === block.id ? { ...task, status, is_completed: done, completed_at: completedAt } : task
+    ));
     setBlockStatus(block, status)
       .then(({ repeated }) => {
         if (repeated) {
           mutate((bs) => [...bs, repeated]);
           touchPageInAllPages(block.page_id, (p) => ({ ...p, blocks: [...(p.blocks ?? []), repeated] }));
+          if (repeated.due_date <= dateKey) setAgendaTasks((tasks) => [...tasks, repeated]);
         }
         setSaveState('saved');
       })
@@ -1027,13 +1061,16 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     navigator.vibrate?.(8);
 	    const patch =
 	      block.kind === 'text'
-	        ? { kind: 'task', status: 'pending' }
+	        ? { kind: 'task', status: 'pending', due_date: dateKey }
 	        : { kind: 'text', status: 'pending', is_completed: false, completed_at: null };
 	    mutate((bs) => bs.map((b) => (b.id === block.id ? { ...b, ...patch } : b)));
     touchPageInAllPages(block.page_id, (p) => ({
       ...p,
-      blocks: (p.blocks ?? []).map((b) => (b.id === block.id ? { ...b, ...patch } : b)),
-    }));
+	      blocks: (p.blocks ?? []).map((b) => (b.id === block.id ? { ...b, ...patch } : b)),
+	    }));
+	    setAgendaTasks((tasks) =>
+	      block.kind === 'text' ? [...tasks, { ...block, ...patch }] : tasks.filter((task) => task.id !== block.id)
+	    );
 	    updateBlock(block.id, patch).catch(() => load());
 	  };
 
@@ -1747,6 +1784,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
               onRename={renameDayTask}
               onReorder={reorderDayTasks}
               onDelete={deleteDayTask}
+              onMoveToToday={moveOverdueToToday}
             />
           )}
 
@@ -1769,7 +1807,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
                 </button>
               </div>
 
-              {visibleNoteCards.length === 0 ? (
+              {notesScope === 'all' && !allPagesLoaded ? (
+                <div className="inline-loading"><div className="spinner" /></div>
+              ) : visibleNoteCards.length === 0 ? (
                 <button type="button" className="empty-note-card" onClick={addNotePage}>
                   <span>{notesScope === 'all' ? 'لا توجد ملاحظات' : 'لا توجد ملاحظات اليوم'}</span>
                   <strong>ابدأ ملاحظة جديدة</strong>

@@ -92,7 +92,7 @@ function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDragSt
   );
 }
 
-function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReorder, onDelete }) {
+function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReorder, onDelete, onMoveToToday }) {
   const sortedTasks = useMemo(
     () => [...tasks].sort((a, b) => taskOrder(a) - taskOrder(b) || new Date(a.created_at || 0) - new Date(b.created_at || 0)),
     [tasks]
@@ -105,6 +105,7 @@ function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReo
   const orderRef = useRef(order);
   const dragHandleRef = useRef(null);
   const dragMovedRef = useRef(false);
+  const moveToTodayRef = useRef(false);
   const persistTimerRef = useRef(null);
 
   useEffect(() => {
@@ -153,8 +154,10 @@ function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReo
     event.preventDefault();
     const hit = document.elementFromPoint(event.clientX, event.clientY);
     const overTrash = Boolean(hit?.closest?.('.day-task-trash'));
+    const overToday = Boolean(hit?.closest?.('.day-task-today-drop'));
     setTrashActive(overTrash);
-    if (overTrash) return;
+    moveToTodayRef.current = overToday;
+    if (overTrash || overToday) return;
     const targetRow = hit?.closest?.('.day-task-row');
     const targetId = targetRow?.dataset.taskId;
     if (!targetId || !orderRef.current.includes(targetId) || targetId === activeId) return;
@@ -168,13 +171,16 @@ function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReo
     try { dragHandleRef.current?.releasePointerCapture?.(event.pointerId); } catch { /* انتهى المؤشر */ }
     setDraggingId(null);
     const shouldDelete = trashActive;
+    const shouldMoveToday = moveToTodayRef.current;
     setTrashActive(false);
+    moveToTodayRef.current = false;
     draggingIdRef.current = null;
     dragHandleRef.current = null;
     clearTimeout(persistTimerRef.current);
     if (dragMovedRef.current) onReorder(orderRef.current);
     dragMovedRef.current = false;
     if (shouldDelete && onDelete) onDelete(releasedId);
+    else if (shouldMoveToday && onMoveToToday) onMoveToToday(releasedId);
     navigator.vibrate?.(8);
   };
 
@@ -212,9 +218,12 @@ function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReo
   });
 }
 
-export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggle, onRename, onReorder, onDelete }) {
+export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggle, onRename, onReorder, onDelete, onMoveToToday }) {
   const [draft, setDraft] = useState('');
   const [adding, setAdding] = useState(false);
+  const [showOverdue, setShowOverdue] = useState(true);
+  const [remainingOnly, setRemainingOnly] = useState(false);
+  const visibleTasks = remainingOnly ? tasks.filter((task) => !(task.status === 'done' || task.is_completed)) : tasks;
   const completedCount = tasks.filter((task) => task.status === 'done' || task.is_completed).length;
   const remainingCount = tasks.length - completedCount;
 
@@ -251,15 +260,17 @@ export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggl
             <header className="day-task-group-head">
               <strong>متأخرة</strong>
               <span>{overdueTasks.length}</span>
+              <button type="button" className="day-task-filter-btn" onClick={() => setShowOverdue((open) => !open)}>{showOverdue ? 'إخفاء' : 'إظهار'}</button>
             </header>
-            <ReorderableTaskList
+            {showOverdue && <ReorderableTaskList
               tasks={overdueTasks}
               overdue
               onToggle={onToggle}
               onRename={onRename}
               onReorder={onReorder}
               onDelete={onDelete}
-            />
+              onMoveToToday={onMoveToToday}
+            />}
           </section>
         )}
 
@@ -278,13 +289,17 @@ export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggl
               <p>اكتب المهمة واضغط إضافة؛ بدون نوافذ أو خطوات إضافية.</p>
             </div>
           ) : (
+            <>
+            <button type="button" className="day-task-filter-btn remaining-filter" onClick={() => setRemainingOnly((only) => !only)}>{remainingOnly ? 'عرض الكل' : 'المتبقية فقط'}</button>
+            <div className="day-task-today-drop">اسحب المهمة المتأخرة هنا لنقلها لليوم</div>
             <ReorderableTaskList
-              tasks={tasks}
+              tasks={visibleTasks}
               onToggle={onToggle}
               onRename={onRename}
               onReorder={onReorder}
               onDelete={onDelete}
             />
+            </>
           )}
         </section>
       </div>

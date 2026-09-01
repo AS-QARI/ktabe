@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { exportAll } from '../data/storage';
+import { getProductivityData } from '../data/storage';
 import { useLiveData } from '../hooks/useLiveData';
 import {
   computeTodayProgress,
@@ -25,8 +25,7 @@ const weekdayNarrowFmt = new Intl.DateTimeFormat('ar-u-ca-gregory-nu-latn', {
  *   ٣) آخر ٧ أيام: أعمدة + أيام نشطة + أفضل يوم
  */
 export default function SummaryScreen({ onOpenSettings }) {
-  // نفس مُصدِّر النسخة الاحتياطية يخدم الملخص — مصدر حقيقة واحد
-  const live = useLiveData(exportAll, ALL_TABLES);
+  const live = useLiveData(getProductivityData, ALL_TABLES);
   const data = live.data;
 
   const today = useMemo(
