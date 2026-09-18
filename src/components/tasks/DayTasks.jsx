@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import TaskDetails from './TaskDetails';
-import { CheckIcon, PlusIcon, PinIcon, ChevronLeftIcon, NoteIcon } from '../ui/Icons';
+import { CheckIcon, PlusIcon, PinIcon, ChevronLeftIcon } from '../ui/Icons';
 import './DayTasks.css';
 
 const DAILY_PHRASES = [
@@ -110,7 +110,7 @@ function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDetail
         title={hasDescription ? 'هذه المهمة لها وصف — اضغط لعرضه' : 'تفاصيل المهمة'}
         onClick={() => onDetails(task)}
       >
-        {hasDescription ? <NoteIcon size={18} aria-hidden="true" /> : 'تفاصيل'}
+        <span aria-hidden="true">•••</span>
       </button>
       <button
         type="button"

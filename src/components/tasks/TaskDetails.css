@@ -18,8 +18,8 @@
 .goal-history header { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .goal-history time { font-size: 11px; color: var(--label-secondary); }
 .goal-history p { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 5px; }
-.day-task-details-btn { min-height: 44px; min-width: 44px; color: var(--label-secondary); font-size: 11px; border-radius: 10px; }
-.day-task-details-btn.has-description { display: grid; place-items: center; flex-shrink: 0; color: var(--checklist-accent, #ff9f0a); background: rgba(255,159,10,.08); }
+.day-task-details-btn { min-width: 32px; min-height: 44px; display: grid; place-items: center; flex-shrink: 0; color: var(--label-tertiary); border-radius: 10px; font-size: 14px; font-weight: 900; letter-spacing: 1px; }
+.day-task-details-btn.has-description { color: var(--checklist-accent, #ff9f0a); }
 .goal-group { padding: 0 8px; border: 1px solid rgba(255,159,10,.22); border-radius: 16px; margin-bottom: 6px; background: rgba(255,159,10,.035); }
 .goal-group .day-task-group-head { color: var(--checklist-accent, #ff9f0a); }
 .goal-progress { display: flex; align-items: center; gap: 8px; width: 100%; color: var(--label-secondary); font-size: 11px; }
