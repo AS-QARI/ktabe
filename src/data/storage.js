@@ -1,4 +1,4 @@
-import { readOfflineSnapshot } from '../lib/offlineCache';
+import { readOfflineSnapshot } from '../lib/offlineCache.js';
 
 /*
  * طبقة البيانات المحلية لكتابي.
@@ -268,11 +268,12 @@ export async function getDayPages(dateKey) {
     .sort((a, b) => Number(a.page_no || 0) - Number(b.page_no || 0));
 }
 
-/** مهام اليوم وما قبله — مسار خفيف لشاشة «يومي»، مبني على فهرس الموعد. */
+/** مهام اليوم وما قبله، مع الأهداف المثبّتة من كل الأيام؛ دون تحميل نصوص الملاحظات. */
 export async function getAgendaTasks(dateKey) {
   await ready();
-  const blocks = await getAllFromIndex('blocks', 'due_date', IDBKeyRange.upperBound(dateKey));
-  return blocks.filter((block) => block.kind === 'task' && !block.deleted_at);
+  const blocks = await getAllFromIndex('blocks', 'due_date');
+  return blocks.filter((block) => block.kind === 'task' && !block.deleted_at &&
+    (block.is_pinned || block.due_date <= dateKey));
 }
 
 /** الأيام القريبة التي تحمل كتابة؛ تُستخدم فقط لنقاط شريط الأيام السبعة. */
@@ -380,6 +381,10 @@ export async function createBlock(fields) {
     reminder_at: null,
     deleted_at: null,
     status: 'pending',
+    description: '',
+    is_pinned: false,
+    progress: 0,
+    progress_entries: [],
     created_at: stamp,
     updated_at: stamp,
     ...fields,
@@ -391,12 +396,52 @@ export async function createBlock(fields) {
 
 export async function updateBlock(id, patch) {
   await ready();
-  const block = await getRaw('blocks', id);
-  if (!block) throw new Error('المهمة أو السطر غير موجود');
-  const updated = { ...block, ...patch, id, updated_at: nowIso() };
-  await putRaw('blocks', updated);
+  // Read and write in one transaction so concurrent edits cannot erase progress history.
+  const db = await openDatabase();
+  const tx = db.transaction('blocks', 'readwrite');
+  const done = transactionDone(tx);
+  const store = tx.objectStore('blocks');
+  let updated;
+  let failure;
+  store.get(id).onsuccess = (event) => {
+    try {
+      const block = event.target.result;
+      if (!block) throw new Error('المهمة أو السطر غير موجود');
+      updated = { ...block, ...(typeof patch === 'function' ? patch(block) : patch), id, updated_at: nowIso() };
+      store.put(updated);
+    } catch (error) { failure = error; tx.abort(); }
+  };
+  try { await done; } catch (error) { throw failure || error; }
   announce('blocks');
   return updated;
+}
+
+export async function saveTaskDetails(id, { description, is_pinned, progress, note = '' }) {
+  const percent = Number(progress);
+  if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
+    throw new Error('نسبة التقدم يجب أن تكون بين 0 و100');
+  }
+  return updateBlock(id, (block) => {
+    const previous = block.is_completed ? 100 : (block.progress || 0);
+    const changed = percent !== previous;
+    const entry = note.trim();
+    return {
+      description: description.trim(),
+      is_pinned: Boolean(is_pinned),
+      pinned_at: is_pinned ? (block.pinned_at || nowIso()) : null,
+      // Long-term goals do not generate repeating daily copies.
+      ...(is_pinned ? { repeat_rule: 'none' } : {}),
+      progress: percent,
+      ...((is_pinned || changed) ? {
+        status: percent === 100 ? 'done' : percent > 0 ? 'in_progress' : 'pending',
+        is_completed: percent === 100,
+        completed_at: percent === 100 ? (block.completed_at || nowIso()) : null,
+      } : {}),
+      progress_entries: [...(block.progress_entries || []), ...((entry || changed) ? [{
+        id: makeId(), created_at: nowIso(), note: entry, progress: percent,
+      }] : [])],
+    };
+  });
 }
 
 export async function trashBlock(id) {
@@ -449,12 +494,21 @@ export function nextTaskStatus(status) {
 
 export async function setBlockStatus(block, status) {
   const done = status === 'done';
-  const updated = await updateBlock(block.id, {
-    status,
-    is_completed: done,
-    completed_at: done ? nowIso() : null,
+  const updated = await updateBlock(block.id, (current) => {
+    const progress = done ? 100 : status === 'pending' ? 0 : Math.min(current.progress || 0, 99);
+    return {
+      status,
+      is_completed: done,
+      completed_at: done ? nowIso() : null,
+      progress,
+      ...(current.is_pinned && progress !== current.progress ? {
+        progress_entries: [...(current.progress_entries || []), {
+          id: makeId(), created_at: nowIso(), note: TASK_STATUS_LABELS[status], progress,
+        }],
+      } : {}),
+    };
   });
-  if (!done || !block.repeat_rule || block.repeat_rule === 'none') {
+  if (!done || updated.is_pinned || !block.repeat_rule || block.repeat_rule === 'none') {
     return { updated, repeated: null };
   }
   const dueDate = nextRepeatDate(block.due_date, block.repeat_rule);
@@ -463,6 +517,7 @@ export async function setBlockStatus(block, status) {
     page_id: block.page_id,
     kind: 'task',
     content: block.content,
+    description: block.description || '',
     position: Number(block.position || 0) + 0.01,
     due_date: dueDate,
     priority: block.priority || 0,

@@ -8,6 +8,7 @@ import {
   updatePage,
   createBlock,
   updateBlock,
+  saveTaskDetails,
   setBlockStatus,
   nextTaskStatus,
   TASK_STATUS_LABELS,
@@ -507,9 +508,10 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
   }, [blocks]);
 
   const focusedRow = rows.find((r) => r.block.id === focusedId) ?? null;
-  const dayTasks = agendaTasks.filter((task) => task.due_date === dateKey);
+  const pinnedTasks = agendaTasks.filter((task) => task.is_pinned);
+  const dayTasks = agendaTasks.filter((task) => !task.is_pinned && task.due_date === dateKey);
   const overdueTasks = agendaTasks.filter((task) =>
-    task.due_date < dateKey && task.status !== 'done' && !task.is_completed
+    !task.is_pinned && task.due_date < dateKey && task.status !== 'done' && !task.is_completed
   );
   const dayDoneTasks = dayTasks.filter((task) => task.status === 'done' || task.is_completed);
   const dayProgress =
@@ -739,7 +741,8 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     }));
     navigator.vibrate?.(10);
     setBlockStatus(block, status)
-      .then(({ repeated }) => {
+      .then(({ updated, repeated }) => {
+        updateDayTaskEverywhere(block.id, () => updated);
         if (repeated) {
           setPages((ps) => ps.map((p) => p.id === repeated.page_id
             ? { ...p, blocks: [...(p.blocks ?? []), repeated] }
@@ -750,6 +753,18 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         setSaveState('saved');
       })
       .catch(() => { setSaveState('error'); load(); });
+  };
+
+  const saveDayTaskDetails = async (id, details) => {
+    markEdit();
+    try {
+      const updated = await saveTaskDetails(id, details);
+      updateDayTaskEverywhere(id, () => updated);
+      setSaveState('saved');
+    } catch (error) {
+      setSaveState('error');
+      throw error;
+    }
   };
 
   const renameDayTask = (block, content) => {
@@ -1044,7 +1059,8 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       task.id === block.id ? { ...task, status, is_completed: done, completed_at: completedAt } : task
     ));
     setBlockStatus(block, status)
-      .then(({ repeated }) => {
+      .then(({ updated, repeated }) => {
+        updateDayTaskEverywhere(block.id, () => updated);
         if (repeated) {
           mutate((bs) => [...bs, repeated]);
           touchPageInAllPages(block.page_id, (p) => ({ ...p, blocks: [...(p.blocks ?? []), repeated] }));
@@ -1664,9 +1680,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
           ))}
         </div>
         {isToday ? (
-          <div className="day-progress-pill" style={{ '--progress': `${dayProgress}%` }}>
+          <div className="day-progress-pill" style={{ '--progress': `${dayProgress}%` }} role="img" aria-label={`أنجزت ${dayDoneTasks.length} من ${dayTasks.length} مهمات، بنسبة ${dayProgress} بالمئة`}>
             <strong>{dayProgress}%</strong>
-            <span>إنجاز</span>
+            <span>{dayTasks.length ? `${dayDoneTasks.length}/${dayTasks.length}` : 'إنجاز'}</span>
           </div>
         ) : (
           <button
@@ -1748,7 +1764,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
               >
                 <ChecklistIcon size={17} />
                 مهمات
-                {dayTasks.length > 0 && <span>{dayDoneTasks.length}/{dayTasks.length}</span>}
+                {dayTasks.length > 0 && <span>{isToday ? `${dayDoneTasks.length}/${dayTasks.length}` : `${dayProgress}% · ${dayDoneTasks.length}/${dayTasks.length}`}</span>}
               </button>
               <button
                 type="button"
@@ -1776,9 +1792,11 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
           {pages !== null && !error && dayView === 'tasks' && (
             <DayTasks
+              key={dateKey}
+              pinnedTasks={pinnedTasks.map((task) => ({ ...task, text: contentText(task.content) || 'مهمة بلا عنوان' }))}
+              onSaveDetails={saveDayTaskDetails}
               tasks={dayTasks.map((task) => ({ ...task, text: contentText(task.content) || 'مهمة بلا عنوان' }))}
               overdueTasks={overdueTasks.map((task) => ({ ...task, text: contentText(task.content) || 'مهمة بلا عنوان' }))}
-              progress={dayProgress}
               onAdd={addDayTask}
               onToggle={toggleDayTask}
               onRename={renameDayTask}

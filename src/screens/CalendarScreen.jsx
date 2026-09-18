@@ -174,7 +174,7 @@ export default function CalendarScreen({ onOpenSettings, onOpenDay }) {
     const subCount = new Map();
 
     for (const b of data?.blocks ?? []) {
-      if (b.kind !== 'task' || b.deleted_at) continue;
+      if (b.kind !== 'task' || b.deleted_at || b.is_pinned) continue;
       if (b.parent_id) {
         if (!b.is_completed) subCount.set(b.parent_id, (subCount.get(b.parent_id) ?? 0) + 1);
         continue;

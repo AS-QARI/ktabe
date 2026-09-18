@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import Modal from '../ui/Modal';
+import TaskDescription from '../tasks/TaskDescription';
 import { createBlock, createPage, getDayPages, updatePage } from '../../data/storage';
 import { todayKey } from '../../utils/dates';
 import { CalendarIcon, NoteIcon, TaskCircleIcon } from '../ui/Icons';
@@ -20,6 +21,8 @@ function nextPageNo(pages) {
 export default function QuickCapture({ open, onClose }) {
   const [kind, setKind] = useState('task');
   const [text, setText] = useState('');
+  const [description, setDescription] = useState('');
+  const [listening, setListening] = useState(false);
   const [dueDate, setDueDate] = useState(todayKey);
   const [priority, setPriority] = useState(0);
   const [repeatRule, setRepeatRule] = useState('none');
@@ -34,6 +37,8 @@ export default function QuickCapture({ open, onClose }) {
   const reset = () => {
     setKind('task');
     setText('');
+    setDescription('');
+    setListening(false);
     setDueDate(todayKey());
     setPriority(0);
     setRepeatRule('none');
@@ -52,7 +57,7 @@ export default function QuickCapture({ open, onClose }) {
     event.preventDefault();
     const noteText = text.trim();
     const canSave = kind === 'task' ? noteText : noteText || template.lines.length;
-    if (!canSave || busy) return;
+    if (!canSave || busy || listening) return;
     setBusy(true);
     try {
       if (kind === 'task') {
@@ -63,6 +68,7 @@ export default function QuickCapture({ open, onClose }) {
           page_id: page.id,
           kind: 'task',
           content: noteText,
+          description: description.trim(),
           position,
           due_date: dueDate,
           priority,
@@ -107,6 +113,7 @@ export default function QuickCapture({ open, onClose }) {
 
         {kind === 'task' ? (
           <>
+            {open && <TaskDescription value={description} onChange={setDescription} onListeningChange={setListening} disabled={busy} />}
             <div className="field">
               <label className="field-label" htmlFor="quick-capture-date">الموعد</label>
               <div className="capture-date">
@@ -135,7 +142,7 @@ export default function QuickCapture({ open, onClose }) {
           </div>
         )}
 
-        <button type="submit" className="btn-primary" disabled={busy || (kind === 'task' ? !text.trim() || !dueDate : !text.trim() && !template.lines.length)}>
+        <button type="submit" className="btn-primary" disabled={busy || listening || (kind === 'task' ? !text.trim() || !dueDate : !text.trim() && !template.lines.length)}>
           {busy ? 'جارٍ الحفظ…' : kind === 'task' ? 'إضافة المهمة' : 'إنشاء الملاحظة'}
         </button>
       </form>

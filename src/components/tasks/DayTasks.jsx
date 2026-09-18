@@ -1,15 +1,46 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckIcon, PlusIcon } from '../ui/Icons';
+import TaskDetails from './TaskDetails';
+import { CheckIcon, PlusIcon, PinIcon, ChevronLeftIcon, NoteIcon } from '../ui/Icons';
 import './DayTasks.css';
+
+const DAILY_PHRASES = [
+  { title: 'يوم جديد', text: 'اكتب أول مهمة، ودع الوضوح يقود يومك.' },
+  { title: 'اكتبها لتبدأ', text: 'المهمة المكتوبة أخف من الفكرة التي تدور في رأسك.' },
+  { title: 'خطوة صغيرة تكفي', text: 'لا تنتظر الوقت المثالي؛ ابدأ بما تستطيع الآن.' },
+  { title: 'رتّب يومك بهدوء', text: 'كل مهمة تكتبها تمنحك مساحة أكبر للتركيز.' },
+  { title: 'أنجز واحدة الآن', text: 'الإنجاز الكبير يبدأ بمهمة واضحة وصغيرة.' },
+  { title: 'أفكارك تستحق صفحة', text: 'اكتب ما يشغلك، ثم حوّله إلى خطوة قابلة للإنجاز.' },
+  { title: 'أنت في المسار', text: 'التقدم لا يحتاج سرعة؛ يحتاج استمرارًا.' },
+  { title: 'خفّفها بالكتابة', text: 'حين تكتب المهمة، يصبح الطريق إليها أوضح.' },
+  { title: 'ركّز على التالي', text: 'لا تحمل اليوم كله؛ اختر الخطوة القادمة فقط.' },
+  { title: 'إنجازك يتراكم', text: 'مهمة بعد مهمة، تبني يومًا تفتخر به.' },
+  { title: 'ابدأ من هنا', text: 'اكتب الشيء الأهم، وامنحه انتباهك الكامل.' },
+  { title: 'الوضوح قوة', text: 'قائمة بسيطة اليوم قد تغيّر أسبوعك كله.' },
+  { title: 'اترك أثرًا اليوم', text: 'أنجز شيئًا واحدًا يجعل الغد أسهل.' },
+  { title: 'لا تؤجل البداية', text: 'افتح مهمتك الأولى، وخذ منها دقيقة واحدة.' },
+  { title: 'كل سطر تقدّم', text: 'اكتب، نفّذ، ثم احتفل بالخطوة التي قطعتها.' },
+  { title: 'يومك بين يديك', text: 'رتّب أولوياتك واترك الباقي لوقته.' },
+  { title: 'المهم أن تستمر', text: 'حتى الخطوة الهادئة تقرّبك من هدفك.' },
+  { title: 'حوّل النية إلى فعل', text: 'اكتب المهمة بصيغة واضحة وابدأ بها.' },
+  { title: 'مساحة جديدة', text: 'املأ يومك بما يهمك، مهمة واحدة في كل مرة.' },
+  { title: 'أحسنت لأنك بدأت', text: 'استمرارك في الكتابة هو بداية إنجازك.' },
+];
+
+function dailyPhrase() {
+  const now = new Date();
+  const dayNumber = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000);
+  return DAILY_PHRASES[((dayNumber % DAILY_PHRASES.length) + DAILY_PHRASES.length) % DAILY_PHRASES.length];
+}
 
 function taskOrder(task) {
   return Number(task.task_order ?? task.position ?? 0);
 }
 
-function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDragStart, onDragMove, onDragEnd, onKeyboardMove }) {
+function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDetails, onDragStart, onDragMove, onDragEnd, onKeyboardMove }) {
   const [draft, setDraft] = useState(task.text);
   const status = task.status === 'postponed' ? 'pending' : (task.status || 'pending');
   const done = status === 'done' || task.is_completed;
+  const hasDescription = Boolean(task.description?.trim());
 
   useEffect(() => setDraft(task.text), [task.text]);
 
@@ -41,9 +72,9 @@ function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDragSt
       <button
         type="button"
         className="day-task-check"
-        aria-label={`${nextLabel} ${task.text}`}
+        aria-label={task.is_pinned ? `تحديث تقدم ${task.text}` : `${nextLabel} ${task.text}`}
         aria-pressed={done}
-        onClick={() => onToggle(task)}
+        onClick={() => task.is_pinned ? onDetails(task) : onToggle(task)}
       >
         {status === 'in_progress' && <span className="day-task-working-dot" />}
         {done && <CheckIcon size={14} />}
@@ -69,8 +100,18 @@ function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDragSt
         />
         {status === 'in_progress' && <span className="day-task-status">شغال عليها</span>}
         {done && <span className="day-task-status done-label">مكتملة</span>}
+        {task.is_pinned && <div className="goal-progress"><progress max="100" value={task.is_completed ? 100 : (task.progress || 0)} aria-label={`تقدم ${task.text}`} /><span>{task.is_completed ? 100 : (task.progress || 0)}%</span></div>}
       </div>
 
+      <button
+        type="button"
+        className={`day-task-details-btn${hasDescription ? ' has-description' : ''}`}
+        aria-label={hasDescription ? `عرض وصف ${task.text}` : `تفاصيل ${task.text}`}
+        title={hasDescription ? 'هذه المهمة لها وصف — اضغط لعرضه' : 'تفاصيل المهمة'}
+        onClick={() => onDetails(task)}
+      >
+        {hasDescription ? <NoteIcon size={18} aria-hidden="true" /> : 'تفاصيل'}
+      </button>
       <button
         type="button"
         className="day-task-drag-handle"
@@ -92,7 +133,7 @@ function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDragSt
   );
 }
 
-function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReorder, onDelete, onMoveToToday }) {
+function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReorder, onDelete, onMoveToToday, onDetails }) {
   const sortedTasks = useMemo(
     () => [...tasks].sort((a, b) => taskOrder(a) - taskOrder(b) || new Date(a.created_at || 0) - new Date(b.created_at || 0)),
     [tasks]
@@ -207,6 +248,7 @@ function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReo
         dragging={draggingId === task.id}
         onToggle={onToggle}
         onRename={onRename}
+        onDetails={onDetails}
         onDragStart={startDrag}
         onDragMove={dragMove}
         onDragEnd={endDrag}
@@ -218,14 +260,17 @@ function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReo
   });
 }
 
-export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggle, onRename, onReorder, onDelete, onMoveToToday }) {
+export default function DayTasks({ tasks, overdueTasks, pinnedTasks, onAdd, onToggle, onRename, onReorder, onDelete, onMoveToToday, onSaveDetails }) {
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [goalsOpen, setGoalsOpen] = useState(false);
+  const [showCompletedGoals, setShowCompletedGoals] = useState(false);
+  const visibleGoals = pinnedTasks.filter((task) => showCompletedGoals || !task.is_completed);
   const [draft, setDraft] = useState('');
   const [adding, setAdding] = useState(false);
   const [showOverdue, setShowOverdue] = useState(true);
   const [remainingOnly, setRemainingOnly] = useState(false);
   const visibleTasks = remainingOnly ? tasks.filter((task) => !(task.status === 'done' || task.is_completed)) : tasks;
-  const completedCount = tasks.filter((task) => task.status === 'done' || task.is_completed).length;
-  const remainingCount = tasks.length - completedCount;
+  const encouragement = dailyPhrase();
 
   const submit = async (event) => {
     event.preventDefault();
@@ -239,22 +284,23 @@ export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggl
 
   return (
     <section className="day-tasks" aria-label="مهمات اليوم">
-      <div className="day-tasks-summary">
-        <div
-          className="day-tasks-progress"
-          style={{ '--task-progress': `${progress}%` }}
-          role="img"
-          aria-label={`أنجزت ${progress} بالمئة من مهمات اليوم`}
-        >
-          <span>{progress}%</span>
-        </div>
-        <div>
-          <strong>{remainingCount ? `${remainingCount} متبقية` : tasks.length ? 'اكتمل يومك' : 'يوم جديد'}</strong>
-          <p>{tasks.length ? `${completedCount} من ${tasks.length} مهمات مكتملة` : 'أضف أول مهمة وابدأ بخطوة صغيرة.'}</p>
-        </div>
-      </div>
-
       <div className="day-task-list">
+        <p className="day-task-encouragement" role="status" aria-atomic="true">
+          <strong>{encouragement.title}</strong>
+          <span>{encouragement.text}</span>
+        </p>
+        <section className="day-task-group goal-group" aria-label="أهدافي المثبتة">
+          <button type="button" className="goal-toggle" aria-expanded={goalsOpen} aria-controls="pinned-goals-content" onClick={() => setGoalsOpen((open) => !open)}>
+            <PinIcon size={15} /><strong>أهدافي المثبّتة</strong>
+            <span className="goal-count">{pinnedTasks.filter((task) => !task.is_completed).length}</span>
+            <ChevronLeftIcon size={16} className={goalsOpen ? 'goal-chevron is-open' : 'goal-chevron'} />
+          </button>
+          <div id="pinned-goals-content" hidden={!goalsOpen}>
+            {pinnedTasks.some((task) => task.is_completed) && <button type="button" className="day-task-filter-btn goal-completed-filter" onClick={() => setShowCompletedGoals((value) => !value)}>{showCompletedGoals ? 'إخفاء المكتملة' : 'عرض المكتملة'}</button>}
+            {!visibleGoals.length && <p className="goal-empty">{pinnedTasks.length ? 'أنجزت أهدافك المثبّتة. بداية جديدة تنتظرك.' : 'عندك هدف كبير؟ افتح «تفاصيل» أي مهمة وثبّتها هنا.'}</p>}
+            {goalsOpen && <ReorderableTaskList tasks={visibleGoals} onToggle={onToggle} onRename={onRename} onReorder={onReorder} onDelete={onDelete} onDetails={setSelectedTask} />}
+          </div>
+        </section>
         {overdueTasks.length > 0 && (
           <section className="day-task-group overdue-group" aria-label="المهمات المتأخرة">
             <header className="day-task-group-head">
@@ -267,6 +313,7 @@ export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggl
               overdue
               onToggle={onToggle}
               onRename={onRename}
+              onDetails={setSelectedTask}
               onReorder={onReorder}
               onDelete={onDelete}
               onMoveToToday={onMoveToToday}
@@ -288,6 +335,7 @@ export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggl
               tasks={visibleTasks}
               onToggle={onToggle}
               onRename={onRename}
+              onDetails={setSelectedTask}
               onReorder={onReorder}
               onDelete={onDelete}
             />
@@ -313,6 +361,7 @@ export default function DayTasks({ tasks, overdueTasks, progress, onAdd, onToggl
         />
         <button type="submit" disabled={!draft.trim() || adding}>{adding ? '…' : 'إضافة'}</button>
       </form>
+      {selectedTask && <TaskDetails key={selectedTask.id} task={selectedTask} onClose={() => setSelectedTask(null)} onSave={onSaveDetails} />}
     </section>
   );
 }

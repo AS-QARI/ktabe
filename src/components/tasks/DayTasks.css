@@ -7,46 +7,6 @@
   padding: 0 12px 10px;
 }
 
-.day-tasks-summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 4px 12px;
-  flex: 0 0 auto;
-}
-
-.day-tasks-summary strong {
-  display: block;
-  font-size: 17px;
-  font-weight: 850;
-}
-
-.day-tasks-summary p {
-  margin-top: 1px;
-  color: var(--label-tertiary);
-  font-size: 12.5px;
-}
-
-.day-tasks-progress {
-  --task-progress: 0%;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle closest-side, #111115 77%, transparent 79% 100%),
-    conic-gradient(var(--checklist-accent) var(--task-progress), rgba(255,255,255,.09) 0);
-}
-
-.day-tasks-progress span {
-  color: #ffd39a;
-  font-size: 11px;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-}
-
 .day-task-list {
   min-height: 0;
   flex: 1;
@@ -57,6 +17,24 @@
 }
 
 .day-task-list::-webkit-scrollbar { display: none; }
+
+.day-task-encouragement {
+  margin: 0;
+  padding: 7px 4px 8px;
+  text-align: center;
+  color: var(--label-secondary);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.day-task-encouragement strong {
+  display: block;
+  color: var(--checklist-accent, #ff9f0a);
+  font-size: 15px;
+  font-weight: 850;
+  line-height: 1.25;
+  margin-bottom: 1px;
+}
 
 .day-task-group + .day-task-group { margin-top: 10px; }
 
@@ -352,7 +330,6 @@
 
 @media (max-width: 360px) {
   .day-tasks { padding-inline: 9px; }
-  .day-tasks-summary { padding-top: 5px; }
   .day-task-row { min-height: 42px; }
 }
 

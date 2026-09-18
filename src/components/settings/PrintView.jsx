@@ -51,13 +51,13 @@ export default function PrintView({ data }) {
                     return (
                       <li key={r.id} className={r.kind === 'task' ? 'print-task' : ''}>
                         {r.kind === 'task' ? taskGlyph(r) : ''}
-                        {r.content}
+                        {r.content}<TaskExtras block={r} />
                         {kids.length > 0 && (
                           <ul className="print-lines sub">
                             {kids.map((k) => (
                               <li key={k.id} className={k.kind === 'task' ? 'print-task' : ''}>
                                 {k.kind === 'task' ? taskGlyph(k) : ''}
-                                {k.content}
+                                {k.content}<TaskExtras block={k} />
                               </li>
                             ))}
                           </ul>
@@ -87,4 +87,15 @@ export default function PrintView({ data }) {
     </div>,
     document.body
   );
+}
+
+function TaskExtras({ block }) {
+  if (block.kind !== 'task') return null;
+  return <>
+    {block.is_pinned && <p>هدف مثبّت — {block.is_completed ? 100 : (block.progress || 0)}%</p>}
+    {block.description && <p style={{ whiteSpace: 'pre-wrap' }}>{block.description}</p>}
+    {(block.progress_entries || []).map((entry) => <p key={entry.id} style={{ whiteSpace: 'pre-wrap' }}>
+      {formatDateWithYear(new Date(entry.created_at))} — {entry.progress}%: {entry.note || 'تحديث نسبة الإنجاز'}
+    </p>)}
+  </>;
 }

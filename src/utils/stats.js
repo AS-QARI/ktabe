@@ -29,7 +29,7 @@ function completionDays(data) {
 export function computeTodayProgress(data) {
   const today = todayKey();
   const pageDates = new Map(data.pages.map((page) => [page.id, page.page_date]));
-  const tasks = taskBlocks(data);
+  const tasks = taskBlocks(data).filter((task) => !task.is_pinned);
   const onToday = tasks.filter((task) => (task.due_date ?? pageDates.get(task.page_id)) === today);
   const todayIds = new Set(onToday.map((task) => task.id));
   const doneElsewhere = tasks.filter(
