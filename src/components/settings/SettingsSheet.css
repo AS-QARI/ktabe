@@ -98,6 +98,15 @@
 }
 
 .settings-row-value { margin-inline-start: auto; color: var(--label-tertiary); font-size: 12px; }
+.pdf-export-options { display: flex; flex-direction: column; gap: 10px; padding: 4px 16px 16px; background: var(--bg); }
+.pdf-export-options > p:first-child { color: var(--label-secondary); font-size: 12px; }
+.pdf-export-ranges { display: grid; gap: 7px; }
+.pdf-export-ranges button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 49px; padding: 10px 12px; border: 1px solid transparent; border-radius: 12px; background: var(--fill); text-align: start; }
+.pdf-export-ranges button.active { border-color: var(--tint); background: color-mix(in srgb, var(--tint) 13%, var(--fill)); }
+.pdf-export-ranges strong { font-size: 13px; }.pdf-export-ranges small, .pdf-export-hint { color: var(--label-tertiary); font-size: 11px; }
+.pdf-export-days { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--label-secondary); font-size: 13px; }
+.pdf-export-days input { width: 80px; min-height: 38px; padding: 6px 9px; border: 0; border-radius: 10px; background: var(--fill); text-align: center; }
+.pdf-export-hint { line-height: 1.6; }
 .trash-list { display: flex; flex-direction: column; gap: 8px; }
 .trash-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border-radius: 13px; background: var(--fill); }
 .trash-row > div:first-child { min-width: 0; display: grid; gap: 3px; }.trash-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }.trash-row small { color: var(--label-tertiary); font-size: 11px; }

@@ -8,6 +8,7 @@ import {
   updatePage,
   createBlock,
   updateBlock,
+  rescheduleTask,
   saveTaskDetails,
   setBlockStatus,
   nextTaskStatus,
@@ -809,7 +810,9 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
     const task = agendaTasks.find((item) => item.id === id);
     if (!task) return;
     updateDayTaskEverywhere(id, (item) => ({ ...item, due_date: dateKey, calendar_only: false }));
-    updateBlock(id, { due_date: dateKey, calendar_only: false }).catch(() => load());
+    rescheduleTask(task, dateKey)
+      .then((updated) => updateDayTaskEverywhere(id, () => updated))
+      .catch(() => load());
   };
 
   const addNotePage = async () => {

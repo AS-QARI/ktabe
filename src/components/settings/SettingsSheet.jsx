@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Modal from '../ui/Modal';
 import PrintView from './PrintView';
+import PdfExportOptions from './PdfExportOptions';
 import TrashSheet from './TrashSheet';
 import { changePin, exportAll, importAll } from '../../data/storage';
 import { clearUnlock } from '../../lib/session';
@@ -28,6 +29,7 @@ export default function SettingsSheet({ open, onClose }) {
   const [pinMsg, setPinMsg] = useState(null); // { ok, text }
   const [busy, setBusy] = useState(false);
   const [printData, setPrintData] = useState(null);
+  const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
   const fileInput = useRef(null);
 
@@ -39,6 +41,7 @@ export default function SettingsSheet({ open, onClose }) {
       setConfirmPin('');
       setPinMsg(null);
       setBusy(false);
+      setPdfOptionsOpen(false);
     }
   }, [open]);
 
@@ -97,10 +100,11 @@ export default function SettingsSheet({ open, onClose }) {
     }
   };
 
-  const exportPdf = async () => {
+  const exportPdf = async (selection) => {
     setBusy(true);
     try {
-      setPrintData(await exportAll());
+      setPrintData({ data: await exportAll(), selection });
+      setPdfOptionsOpen(false);
     } catch {
       window.alert('تعذّر التصدير — تأكد من الاتصال');
     } finally {
@@ -217,7 +221,7 @@ export default function SettingsSheet({ open, onClose }) {
             </button>
           </div>
 
-          <p className="settings-group-title">النسخ الاحتياطي</p>
+          <p className="settings-group-title">النسخ والتصدير</p>
           <div className="card-list">
             <button
               type="button"
@@ -232,11 +236,13 @@ export default function SettingsSheet({ open, onClose }) {
               type="button"
               className="settings-row"
               disabled={busy}
-              onClick={exportPdf}
+              onClick={() => setPdfOptionsOpen((open) => !open)}
             >
               <span className="settings-row-icon"><PrinterIcon size={20} /></span>
-              <span className="settings-row-label">تصدير PDF (للقراءة والطباعة)</span>
+              <span className="settings-row-label">تصدير ملخص PDF</span>
+              <span className={`settings-chevron${pdfOptionsOpen ? ' open' : ''}`}><ChevronLeftIcon size={16} /></span>
             </button>
+            {pdfOptionsOpen && <PdfExportOptions busy={busy} onExport={exportPdf} />}
             <button
               type="button"
               className="settings-row"
@@ -272,7 +278,7 @@ export default function SettingsSheet({ open, onClose }) {
         onChange={importJson}
       />
 
-      {printData && <PrintView data={printData} />}
+      {printData && <PrintView data={printData.data} selection={printData.selection} />}
       <TrashSheet open={trashOpen} onClose={() => setTrashOpen(false)} />
     </>
   );

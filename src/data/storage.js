@@ -385,6 +385,7 @@ export async function createBlock(fields) {
     is_pinned: false,
     progress: 0,
     progress_entries: [],
+    task_events: [],
     created_at: stamp,
     updated_at: stamp,
     ...fields,
@@ -495,12 +496,22 @@ export function nextTaskStatus(status) {
 export async function setBlockStatus(block, status) {
   const done = status === 'done';
   const updated = await updateBlock(block.id, (current) => {
+    const changed = (current.status || 'pending') !== status;
+    const stamp = nowIso();
     const progress = done ? 100 : status === 'pending' ? 0 : Math.min(current.progress || 0, 99);
     return {
       status,
       is_completed: done,
-      completed_at: done ? nowIso() : null,
+      completed_at: done ? (current.status === 'done' && current.completed_at ? current.completed_at : stamp) : null,
       progress,
+      ...(current.kind === 'task' && changed ? {
+        task_events: [...(current.task_events || []), {
+          id: makeId(),
+          type: done ? 'completed' : 'status_changed',
+          status,
+          created_at: stamp,
+        }],
+      } : {}),
       ...(current.is_pinned && progress !== current.progress ? {
         progress_entries: [...(current.progress_entries || []), {
           id: makeId(), created_at: nowIso(), note: TASK_STATUS_LABELS[status], progress,
@@ -524,6 +535,24 @@ export async function setBlockStatus(block, status) {
     repeat_rule: block.repeat_rule,
   });
   return { updated, repeated };
+}
+
+/** يغيّر موعد المهمة مع الاحتفاظ بسبب ظهورها في ملخص اليوم لاحقًا. */
+export async function rescheduleTask(block, dueDate) {
+  return updateBlock(block.id, (current) => {
+    if (current.due_date === dueDate) return { calendar_only: false };
+    return {
+      due_date: dueDate,
+      calendar_only: false,
+      task_events: [...(current.task_events || []), {
+        id: makeId(),
+        type: 'rescheduled',
+        from_date: current.due_date,
+        to_date: dueDate,
+        created_at: nowIso(),
+      }],
+    };
+  });
 }
 
 export async function deleteBlock(id) {

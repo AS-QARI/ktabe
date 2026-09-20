@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 globalThis.BroadcastChannel = undefined;
 Object.defineProperty(globalThis, 'localStorage', { value: { getItem: () => null }, configurable: true });
 const storage = await import('../src/data/storage.js');
-const { createPage, createBlock, updateBlock, saveTaskDetails, getAgendaTasks, setBlockStatus, exportAll, importAll, trashBlock, restoreBlock } = storage;
+const { createPage, createBlock, updateBlock, saveTaskDetails, getAgendaTasks, setBlockStatus, rescheduleTask, exportAll, importAll, trashBlock, restoreBlock } = storage;
 const page = await createPage('2026-09-19', 1);
 const create = (fields = {}) => createBlock({ page_id: page.id, kind: 'task', content: 'هدف تجريبي', due_date: '2026-09-19', ...fields });
 const details = (overrides = {}) => ({ description: 'وصف عربي', is_pinned: true, progress: 25, note: 'أول خطوة', ...overrides });
@@ -71,11 +71,23 @@ test('status changes synchronize goal progress and retain repeated task descript
   assert.equal(updated.progress, 100);
   assert.equal(updated.progress_entries.length, 2);
   assert.equal(repeated, null);
+  const completedAgain = await setBlockStatus(updated, 'done');
+  assert.equal(completedAgain.updated.completed_at, updated.completed_at);
   const daily = await create({ description: 'وصف متكرر', repeat_rule: 'daily' });
   const result = await setBlockStatus(daily, 'done');
   assert.equal(result.repeated.description, daily.description);
   assert.equal(result.repeated.is_pinned, false);
   assert.equal(result.repeated.progress, 0);
+});
+test('rescheduling preserves the old and new dates for the diary report', async () => {
+  const task = await create({ due_date: '2026-09-19' });
+  const moved = await rescheduleTask(task, '2026-09-20');
+  assert.equal(moved.due_date, '2026-09-20');
+  assert.deepEqual(moved.task_events.map(({ type, from_date, to_date }) => ({ type, from_date, to_date })), [
+    { type: 'rescheduled', from_date: '2026-09-19', to_date: '2026-09-20' },
+  ]);
+  const unchanged = await rescheduleTask(moved, '2026-09-20');
+  assert.equal(unchanged.task_events.length, 1);
 });
 test('trash, restore and JSON backup round trip preserve goals and history', async () => {
   const task = await create();
