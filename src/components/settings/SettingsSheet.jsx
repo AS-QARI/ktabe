@@ -45,14 +45,54 @@ export default function SettingsSheet({ open, onClose }) {
     }
   }, [open]);
 
-  // بعد تجهيز بيانات الطباعة نمهل إطاراً حتى تُرسم ثم نفتح حوار الطباعة
+  // لا نحذف التقرير مباشرة بعد window.print(): في WebView الجوال قد يبدأ
+  // الالتقاط بعد رجوع الدالة، فينتج PDF بخلفية فقط. يبقى الـ Portal مرسوماً
+  // حتى يؤكد المتصفح نهاية الطباعة.
   useEffect(() => {
-    if (!printData) return;
-    const t = setTimeout(() => {
-      window.print();
-      setPrintData(null);
-    }, 200);
-    return () => clearTimeout(t);
+    if (!printData) return undefined;
+
+    let cancelled = false;
+    let printStarted = false;
+    let printFinished = false;
+    let pageWasHidden = false;
+    const printMedia = window.matchMedia?.('print');
+
+    const finishPrint = () => {
+      if (!printStarted || printFinished || cancelled) return;
+      printFinished = true;
+      setPrintData((current) => (current === printData ? null : current));
+    };
+    const onMediaChange = (event) => {
+      if (!event.matches) finishPrint();
+    };
+    const onVisibilityChange = () => {
+      if (!printStarted) return;
+      if (document.visibilityState === 'hidden') pageWasHidden = true;
+      if (pageWasHidden && document.visibilityState === 'visible') finishPrint();
+    };
+
+    window.addEventListener('afterprint', finishPrint);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    if (printMedia?.addEventListener) printMedia.addEventListener('change', onMediaChange);
+    else printMedia?.addListener?.(onMediaChange);
+
+    const timer = window.setTimeout(() => {
+      // إطاران يضمنان أن React رسم التقرير وأن تخطيط A4 حُسب قبل الطباعة.
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        printStarted = true;
+        window.print();
+      }));
+    }, 120);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      window.removeEventListener('afterprint', finishPrint);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (printMedia?.removeEventListener) printMedia.removeEventListener('change', onMediaChange);
+      else printMedia?.removeListener?.(onMediaChange);
+    };
   }, [printData]);
 
   /* ---------- تغيير الرمز ---------- */

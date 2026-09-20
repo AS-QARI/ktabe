@@ -15,12 +15,22 @@
   #root { display: none !important; }
 
   html, body {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
     background: #101014 !important;
+    color-scheme: dark;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
 
   .print-view {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    width: auto !important;
+    visibility: visible !important;
     min-height: 277mm;
     color: #f5f1ea;
     background: #101014;
