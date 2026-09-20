@@ -267,7 +267,7 @@ export default function DayTasks({ tasks, overdueTasks, pinnedTasks, onAdd, onTo
   const visibleGoals = pinnedTasks.filter((task) => showCompletedGoals || !task.is_completed);
   const [draft, setDraft] = useState('');
   const [adding, setAdding] = useState(false);
-  const [showOverdue, setShowOverdue] = useState(true);
+  const [showOverdue, setShowOverdue] = useState(false);
   const [remainingOnly, setRemainingOnly] = useState(false);
   const visibleTasks = remainingOnly ? tasks.filter((task) => !(task.status === 'done' || task.is_completed)) : tasks;
   const encouragement = dailyPhrase();
