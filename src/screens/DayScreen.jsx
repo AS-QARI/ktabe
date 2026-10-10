@@ -697,7 +697,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         position,
         status: 'pending',
         due_date: dateKey,
-        task_order: Math.max(0, ...dayTasks.map((task) => Number(task.task_order ?? task.position ?? 0))) + 1,
+        task_order: Math.min(0, ...dayTasks.map((task) => Number(task.task_order ?? task.position ?? 0))) - 1,
       });
       setPages((ps) => ps.map((p) => p.id === targetPage.id
         ? { ...p, blocks: [...(p.blocks ?? []), block] }
@@ -802,8 +802,13 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
 
   const deleteDayTask = (id) => {
     if (!id) return;
+    markEdit();
+    const deletedAt = new Date().toISOString();
+    updateDayTaskEverywhere(id, (task) => ({ ...task, deleted_at: deletedAt }));
     setAgendaTasks((tasks) => tasks.filter((task) => task.id !== id));
-    trashBlock(id).catch(() => load());
+    trashBlock(id)
+      .then(() => setSaveState('saved'))
+      .catch(() => { setSaveState('error'); load(); });
   };
 
   const moveOverdueToToday = (id) => {

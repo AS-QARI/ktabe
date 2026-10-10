@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import TaskDetails from './TaskDetails';
-import { CheckIcon, PlusIcon, PinIcon, ChevronLeftIcon } from '../ui/Icons';
+import Modal from '../ui/Modal';
+import { CheckIcon, PlusIcon, PinIcon, ChevronLeftIcon, TrashIcon, NoteIcon } from '../ui/Icons';
 import './DayTasks.css';
 
 const DAILY_PHRASES = [
@@ -36,7 +38,7 @@ function taskOrder(task) {
   return Number(task.task_order ?? task.position ?? 0);
 }
 
-function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDetails, onDragStart, onDragMove, onDragEnd, onKeyboardMove }) {
+function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDetails, onOptions, onDragStart, onDragMove, onDragEnd, onKeyboardMove }) {
   const [draft, setDraft] = useState(task.text);
   const status = task.status === 'postponed' ? 'pending' : (task.status || 'pending');
   const done = status === 'done' || task.is_completed;
@@ -106,9 +108,10 @@ function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDetail
       <button
         type="button"
         className={`day-task-details-btn${hasDescription ? ' has-description' : ''}`}
-        aria-label={hasDescription ? `عرض وصف ${task.text}` : `تفاصيل ${task.text}`}
-        title={hasDescription ? 'هذه المهمة لها وصف — اضغط لعرضه' : 'تفاصيل المهمة'}
-        onClick={() => onDetails(task)}
+        aria-label={`خيارات ${task.text}`}
+        aria-haspopup="dialog"
+        title={hasDescription ? 'خيارات المهمة — تحتوي على وصف' : 'خيارات المهمة'}
+        onClick={() => onOptions(task)}
       >
         <span aria-hidden="true">•••</span>
       </button>
@@ -133,7 +136,7 @@ function TaskRow({ task, overdue = false, dragging, onToggle, onRename, onDetail
   );
 }
 
-function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReorder, onDelete, onMoveToToday, onDetails }) {
+function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReorder, onDelete, onMoveToToday, onDetails, onOptions }) {
   const sortedTasks = useMemo(
     () => [...tasks].sort((a, b) => taskOrder(a) - taskOrder(b) || new Date(a.created_at || 0) - new Date(b.created_at || 0)),
     [tasks]
@@ -249,6 +252,7 @@ function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReo
         onToggle={onToggle}
         onRename={onRename}
         onDetails={onDetails}
+        onOptions={onOptions}
         onDragStart={startDrag}
         onDragMove={dragMove}
         onDragEnd={endDrag}
@@ -262,6 +266,7 @@ function ReorderableTaskList({ tasks, overdue = false, onToggle, onRename, onReo
 
 export default function DayTasks({ tasks, overdueTasks, pinnedTasks, onAdd, onToggle, onRename, onReorder, onDelete, onMoveToToday, onSaveDetails }) {
   const [selectedTask, setSelectedTask] = useState(null);
+  const [optionsTask, setOptionsTask] = useState(null);
   const [goalsOpen, setGoalsOpen] = useState(false);
   const [showCompletedGoals, setShowCompletedGoals] = useState(false);
   const visibleGoals = pinnedTasks.filter((task) => showCompletedGoals || !task.is_completed);
@@ -298,7 +303,7 @@ export default function DayTasks({ tasks, overdueTasks, pinnedTasks, onAdd, onTo
           <div id="pinned-goals-content" hidden={!goalsOpen}>
             {pinnedTasks.some((task) => task.is_completed) && <button type="button" className="day-task-filter-btn goal-completed-filter" onClick={() => setShowCompletedGoals((value) => !value)}>{showCompletedGoals ? 'إخفاء المكتملة' : 'عرض المكتملة'}</button>}
             {!visibleGoals.length && <p className="goal-empty">{pinnedTasks.length ? 'أنجزت أهدافك المثبّتة. بداية جديدة تنتظرك.' : 'عندك هدف كبير؟ افتح «تفاصيل» أي مهمة وثبّتها هنا.'}</p>}
-            {goalsOpen && <ReorderableTaskList tasks={visibleGoals} onToggle={onToggle} onRename={onRename} onReorder={onReorder} onDelete={onDelete} onDetails={setSelectedTask} />}
+            {goalsOpen && <ReorderableTaskList tasks={visibleGoals} onToggle={onToggle} onRename={onRename} onReorder={onReorder} onDelete={onDelete} onOptions={setOptionsTask} onDetails={setSelectedTask} />}
           </div>
         </section>
         {overdueTasks.length > 0 && (
@@ -313,7 +318,7 @@ export default function DayTasks({ tasks, overdueTasks, pinnedTasks, onAdd, onTo
               overdue
               onToggle={onToggle}
               onRename={onRename}
-              onDetails={setSelectedTask}
+              onOptions={setOptionsTask} onDetails={setSelectedTask}
               onReorder={onReorder}
               onDelete={onDelete}
               onMoveToToday={onMoveToToday}
@@ -335,7 +340,7 @@ export default function DayTasks({ tasks, overdueTasks, pinnedTasks, onAdd, onTo
               tasks={visibleTasks}
               onToggle={onToggle}
               onRename={onRename}
-              onDetails={setSelectedTask}
+              onOptions={setOptionsTask} onDetails={setSelectedTask}
               onReorder={onReorder}
               onDelete={onDelete}
             />
@@ -361,6 +366,21 @@ export default function DayTasks({ tasks, overdueTasks, pinnedTasks, onAdd, onTo
         />
         <button type="submit" disabled={!draft.trim() || adding}>{adding ? '…' : 'إضافة'}</button>
       </form>
+      {optionsTask && createPortal(
+        <Modal open title="خيارات المهمة" onClose={() => setOptionsTask(null)}>
+          <div className="day-task-actions">
+            <strong>{optionsTask.text}</strong>
+            <button type="button" onClick={() => {
+              setSelectedTask(optionsTask);
+              setOptionsTask(null);
+            }}><NoteIcon size={18} />تفاصيل المهمة</button>
+            <button type="button" className="day-task-delete-btn" onClick={() => {
+              onDelete(optionsTask.id);
+              setOptionsTask(null);
+            }}><TrashIcon size={18} />حذف المهمة</button>
+          </div>
+        </Modal>, document.body
+      )}
       {selectedTask && <TaskDetails key={selectedTask.id} task={selectedTask} onClose={() => setSelectedTask(null)} onSave={onSaveDetails} />}
     </section>
   );

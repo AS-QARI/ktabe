@@ -337,3 +337,8 @@
   .day-task-check,
   .day-task-row { transition: none; }
 }
+
+.day-task-actions { display: flex; flex-direction: column; gap: 8px; padding-block: 8px 16px; }
+.day-task-actions > strong { overflow-wrap: anywhere; margin-bottom: 8px; }
+.day-task-actions button { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 12px; border-radius: 12px; background: var(--fill); text-align: start; }
+.day-task-actions .day-task-delete-btn { color: #ff6961; background: rgba(255,69,58,.12); }
