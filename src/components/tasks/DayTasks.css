@@ -161,8 +161,38 @@
 }
 
 .day-task-row.is-done {
+  min-height: 30px;
+  padding-block: 0;
   opacity: .48;
   background: rgba(255,255,255,.025);
+}
+
+.day-task-row.is-done .day-task-check {
+  width: 18px;
+  height: 18px;
+  border-width: 1.5px;
+}
+
+.day-task-row.is-done .day-task-check svg {
+  width: 10px;
+  height: 10px;
+}
+
+.day-task-row.is-done .day-task-copy input {
+  min-height: 20px;
+  padding-block: 0;
+  font-size: 12.5px;
+}
+
+.day-task-row.is-done .day-task-status,
+.day-task-row.is-done .goal-progress {
+  display: none;
+}
+
+.day-task-row.is-done .day-task-details-btn,
+.day-task-row.is-done .day-task-drag-handle {
+  min-height: 28px;
+  height: 28px;
 }
 
 .day-task-copy {
