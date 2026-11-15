@@ -7,12 +7,14 @@ import { changePin, exportAll, importAll } from '../../data/storage';
 import { clearUnlock } from '../../lib/session';
 import { downloadJson } from '../../utils/download';
 import { todayKey } from '../../utils/dates';
+import { getNewTaskAtTop, setNewTaskAtTop } from '../../utils/prefs';
 import {
   DownloadIcon,
   UploadIcon,
   PrinterIcon,
   LockIcon,
   TrashIcon,
+  ChecklistIcon,
   ChevronLeftIcon,
 } from '../ui/Icons';
 import './SettingsSheet.css';
@@ -31,7 +33,14 @@ export default function SettingsSheet({ open, onClose }) {
   const [printData, setPrintData] = useState(null);
   const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
+  const [newTaskAtTop, setNewTaskAtTopState] = useState(() => getNewTaskAtTop());
   const fileInput = useRef(null);
+
+  const toggleNewTaskAtTop = () => {
+    const next = !newTaskAtTop;
+    setNewTaskAtTop(next);
+    setNewTaskAtTopState(next);
+  };
 
   useEffect(() => {
     if (open) {
@@ -194,6 +203,23 @@ export default function SettingsSheet({ open, onClose }) {
     <>
       <Modal open={open} onClose={onClose} title="الإعدادات">
         <div className="settings">
+          <p className="settings-group-title">ترتيب المهمات</p>
+          <div className="card-list">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={newTaskAtTop}
+              className="settings-row"
+              onClick={toggleNewTaskAtTop}
+            >
+              <span className="settings-row-icon"><ChecklistIcon size={20} /></span>
+              <span className="settings-row-label">إضافة المهمة الجديدة في بداية القائمة</span>
+              <span className={`settings-switch${newTaskAtTop ? ' on' : ''}`} aria-hidden="true">
+                <span className="settings-switch-knob" />
+              </span>
+            </button>
+          </div>
+
           <p className="settings-group-title">الأمان</p>
           <div className="card-list">
             <button

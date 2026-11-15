@@ -98,6 +98,29 @@
 }
 
 .settings-row-value { margin-inline-start: auto; color: var(--label-tertiary); font-size: 12px; }
+.settings-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  margin-inline-start: auto;
+  border-radius: 13px;
+  background: var(--fill-strong);
+  transition: background var(--dur-fast);
+}
+.settings-switch.on { background: var(--success); }
+.settings-switch-knob {
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: inset-inline-start var(--dur-fast) var(--ease-out);
+}
+.settings-switch.on .settings-switch-knob { inset-inline-start: calc(100% - 24px); }
 .pdf-export-options { display: flex; flex-direction: column; gap: 10px; padding: 4px 16px 16px; background: var(--bg); }
 .pdf-export-options > p:first-child { color: var(--label-secondary); font-size: 12px; }
 .pdf-export-ranges { display: grid; gap: 7px; }

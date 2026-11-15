@@ -24,6 +24,7 @@ import {
   formatDateWithYear,
   relativeDayLabel,
 } from '../utils/dates';
+import { getNewTaskAtTop } from '../utils/prefs';
 import {
   GearIcon,
   CalendarIcon,
@@ -690,6 +691,10 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
       }
       const livePage = (pages ?? []).find((p) => p.id === targetPage.id) ?? targetPage;
       const position = Math.max(0, ...(livePage.blocks ?? []).map((b) => Number(b.position || 0))) + 1;
+      const dayTaskOrders = dayTasks.map((task) => Number(task.task_order ?? task.position ?? 0));
+      const newTaskOrder = getNewTaskAtTop()
+        ? Math.min(0, ...dayTaskOrders) - 1
+        : Math.max(0, ...dayTaskOrders) + 1;
       const block = await createBlock({
         page_id: targetPage.id,
         kind: 'task',
@@ -697,7 +702,7 @@ export default function DayScreen({ dateKey, onDateChange, onOpenSettings }) {
         position,
         status: 'pending',
         due_date: dateKey,
-        task_order: Math.min(0, ...dayTasks.map((task) => Number(task.task_order ?? task.position ?? 0))) - 1,
+        task_order: newTaskOrder,
       });
       setPages((ps) => ps.map((p) => p.id === targetPage.id
         ? { ...p, blocks: [...(p.blocks ?? []), block] }
